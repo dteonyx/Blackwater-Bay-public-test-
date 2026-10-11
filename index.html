@@ -1028,7 +1028,7 @@ function shopItems(z){
     items.push({t:'Letter of marque (90s)',d:'The Navy looks the other way for 90 seconds.',c:550,ok:()=>G.marque<=0,run(){G.marque=90;clearHeat('Letter of marque granted. Sail with impunity... for now.');}});
   }else if(z.kind==='armory'){
     const own=k=>!!G.owned[k];
-    const wi=(k,c,d,extra)=>({t:WEAP[k].n,d:own(k)?'Owned. Press '+(WORDER.indexOf(k)+1)+' to equip.':d,c:own(k)?0:c,lbl:own(k)?'Owned':undefined,ok:()=>!own(k),run(){G.owned[k]=1;if(WEAP[k].cat==='melee')G.melee=k;else G.gun=k;if(extra)extra();toast(WEAP[k].n+' acquired and equipped.','good');}});
+    const wi=(k,c,d,extra)=>({t:WEAP[k].n,d:own(k)?'Owned. Equip it from the weapon wheel (Tab).':d,c:own(k)?0:c,lbl:own(k)?'Owned':undefined,ok:()=>!own(k),run(){G.owned[k]=1;if(WEAP[k].cat==='melee')G.melee=k;else G.gun=k;if(extra)extra();toast(WEAP[k].n+' acquired and equipped.','good');}});
     items.push(wi('rapier',130,'Fast and long reach, but light damage.'));
     items.push(wi('axe',170,'Slow and brutal. Wide swing, heavy knockback.'));
     items.push(wi('duel',320,'One accurate, hard-hitting shot. Slow to reload.'));
@@ -1351,7 +1351,9 @@ function updateBullets(dt){
       else if(dist(P.x,P.y,b.x,b.y)<10){hurtPlayer(b.dmg);b.dead=true;}
     }
   }
+  for(const b of bullets)if(b.dead&&b.knife)knifeLand(null,b);
   compact(bullets,b=>!b.dead);
+  knifeStep(null,knifeDrops,P.x,P.y,dt,!P.ship&&!P.dead);
 }
 function updateTurrets(dt){
   const P=player;if(P.dead||G.state!=='play')return;
@@ -2105,6 +2107,7 @@ function render(){
     if(mission&&mission.def.title==="Dead Man's Chest"&&mission.stage===0){ctx.strokeStyle='#b2231a';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(mt.x-12,mt.y-12);ctx.lineTo(mt.x+12,mt.y+12);ctx.moveTo(mt.x+12,mt.y-12);ctx.lineTo(mt.x-12,mt.y+12);ctx.stroke();}
   }
   for(const k of pickups){if(k.x<vx0||k.x>vx1||k.y<vy0||k.y>vy1)continue;drawPickup(k);}
+  for(const k of knifeDrops){if(k.x<vx0||k.x>vx1||k.y<vy0||k.y>vy1)continue;drawKnife(k);}
   for(const c of corpses){if(c.x<vx0||c.x>vx1||c.y<vy0||c.y>vy1)continue;ctx.globalAlpha=clamp(c.t/3,0,1)*0.8;drawFolk({corpse:true,x:c.x,y:c.y,a:c.a,coat:c.coat,coat2:c.coat2,skin:c.skin,hat:c.hat,walk:0,swing:0,weapon:null,flash:0});ctx.globalAlpha=1;}
   for(const s of ships){if(s.x<vx0-150||s.x>vx1+150||s.y<vy0-150||s.y>vy1+150)continue;Q(s.y,()=>{drawShip(s);if(s.own)drawShipTag(s);});}
   for(const h of horses){if(h.x<vx0-40||h.x>vx1+40||h.y<vy0-40||h.y>vy1+40)continue;Q(h.y+(h.ridden&&Math.sin(h.a)>0.62?3:0),()=>drawHorse(h));}
@@ -2304,13 +2307,13 @@ function updateHUD(){
     const kn=Math.round(Math.abs(s.v)/10);
     const spk=curSpecial(s);let spH='';
     const sl=s.sail||0;
-    if(spk){const cdv=s.scd[spk]||0;spH='<span><b>RMB</b>'+MODINFO[spk].n+(cdv<=0?' ready':' '+Math.ceil(cdv)+'s')+(specials(s).length>1?' &nbsp;<b>R</b>switch':'')+'</span>';}
+    if(spk){const cdv=s.scd[spk]||0;spH='<span><b>RMB</b>'+MODINFO[spk].n+(cdv<=0?' ready':' '+Math.ceil(cdv)+'s')+(specials(s).length>1?' &nbsp;<b>Tab</b>wheel':'')+'</span>';}
     spH='<span>Sails<span class="gun"><i style="width:'+(Math.max(0,sl)*100).toFixed(0)+'%"></i></span> '+(sl<-0.02?'astern':Math.round(sl*100)+'%')+'</span>'+spH;
     if(s.mods&&s.mods.bow)spH='<span>Bow<span class="gun"><i style="width:'+((1-clamp(s.scd.bow/SPEC_CD.bow,0,1))*100).toFixed(0)+'%"></i></span></span>'+spH;
     setHTML(weaponEl,'w','<span><b>'+(s.name||st2.name)+'</b>'+kn+' kn</span>'+(st2.guns?'<span>Port<span class="gun"><i style="width:'+(l*100).toFixed(0)+'%"></i></span></span><span>Starboard<span class="gun"><i style="width:'+(r*100).toFixed(0)+'%"></i></span></span>':'<span>No cannons</span>')+spH+'<span><b>F</b>Leave</span>');
   }else{
     const gw=WEAP[G.gun];
-    setHTML(weaponEl,'w','<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span><span style="opacity:.7">1-9 swap &nbsp; <b>H</b>'+(G.steed&&G.steed.follow&&!G.steed.down?'steed: stay':'call steed')+(P.horse?' &nbsp; <b>Q</b>dismount &nbsp; <b>V</b>tonic &times;'+G.items.tonic:'')+'</span>');
+    setHTML(weaponEl,'w','<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span><span style="opacity:.7">Tab wheel &nbsp; <b>H</b>'+(G.steed&&G.steed.follow&&!G.steed.down?'steed: stay':'call steed')+(P.horse?' &nbsp; <b>Q</b>dismount &nbsp; <b>V</b>tonic &times;'+G.items.tonic:'')+'</span>');
   }
   {
     const mh=P.horse;
@@ -2738,7 +2741,9 @@ function updateDeck(dt){
     }
     b.life-=dt;if(b.life<=0)b.dead=true;
   }
+  for(const b of D.bullets)if(b.dead&&b.knife)knifeLand(D,b);
   compact(D.bullets,b=>!b.dead);
+  knifeStep(D,D.knives,p.x,p.y,dt,true);
   for(const b of D.bombs){
     b.t-=dt;
     if(b.fl>0){b.fl-=dt;const nx=b.x+b.vx*dt,ny=b.y+b.vy*dt;if(!deckIn(D,nx,ny)||deckHit(D,nx,ny,3)){b.vx*=-0.2;b.vy*=-0.2;b.fl=0;}else{b.x=nx;b.y=ny;}}
@@ -2759,16 +2764,13 @@ function deckKey(c){
     if(c==="KeyG"&&D.scene==="prison"&&!D.cut&&!D.trans){prisonThrow(D);return;}
     if(D.unarmed)return;
   }
-  if(c.startsWith('Digit')){selectWeapon(parseInt(c.slice(5),10)-1);return;}
-  if(c==='KeyR'){cycleWeapon('gun');return;}
-  if(c==='KeyT'){cycleWeapon('melee');return;}
 }
 function deckHUD(){
   if(G.deck.scene){sceneHUD();return;}
   const P=player,gw=WEAP[G.gun];
   hullRow.style.display='none';
   setTxt(goldTxt,'gold',String(G.gold));
-  setHTML(weaponEl,'w','<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span><span style="opacity:.7">1-9 swap &nbsp; hold <b>E</b> at the bow rail: leave</span>');
+  setHTML(weaponEl,'w','<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span><span style="opacity:.7">Tab wheel &nbsp; hold <b>E</b> at the bow rail: leave</span>');
   if(hc.pr!==''){hc.pr='';promptEl.innerHTML='';promptEl.classList.add('hidden');}
   steedHudEl.classList.add('hidden');
   hurtEl.style.opacity=Math.max(G.hurtFlash,P.hp<30?0.25+0.2*Math.sin(G.t*6):0).toFixed(2);
@@ -2857,6 +2859,7 @@ function renderDeck(){
     }
   }
   for(const b of D.bullets){ctx.strokeStyle=b.col||(b.own==='p'?'rgba(255,240,170,.9)':'rgba(255,200,120,.9)');ctx.lineWidth=b.knife?2.6:2;const tl=b.knife?0.018:0.025;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.vx*tl,b.y-b.vy*tl);ctx.stroke();}
+  if(D.knives)for(const k of D.knives)drawKnife(k);
   for(const b of D.bombs){ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(b.x,b.y,5,0,TAU);ctx.fill();ctx.fillStyle=(Math.floor(G.t*14)%2)?'#ffb347':'#ff5a2a';ctx.beginPath();ctx.arc(b.x+3,b.y-5,2.2,0,TAU);ctx.fill();}
   drawParts(1);
   // screen space overlay
@@ -2888,9 +2891,11 @@ function onKey(c){
   if(c==='Escape'){
     if(G.shop){closeShop();return;}
     if(G.bigmap){toggleMap();return;}
+    if(WHEEL.open){WHEEL.close();return;}
     setPaused(!G.paused);return;
   }
   if(G.paused)return;
+  if(WHEEL.open)return;
   if(c==='KeyM'){toggleMap();return;}
   if(c==='KeyN'){G.mute=!G.mute;applyMaster();toast(G.mute?'Sound off':'Sound on');return;}
   if(G.shop){
@@ -2901,9 +2906,6 @@ function onKey(c){
   if(player.dead)return;
   if(G.dlg){dlgKey(c);return;}
   if(G.deck){deckKey(c);return;}
-  if(c.startsWith('Digit')){selectWeapon(parseInt(c.slice(5),10)-1);return;}
-  if(c==='KeyR'){if(player.ship&&specials(player.ship).length>1){cycleSpecial();return;}cycleWeapon('gun');return;}
-  if(c==='KeyT'){cycleWeapon('melee');return;}
   if(c==='KeyQ'&&player.horse){dismount();return;}
   if(c==='KeyH'){whistle();return;}
   if(c==='KeyV'){useTonic();return;}
@@ -3127,7 +3129,7 @@ function applySave(d){
 }
 
 function startGame(cont){
-  audioInit();if(AC&&AC.state==='suspended')AC.resume();
+  audioInit();if(AC&&AC.state==='suspended')AC.resume();knifeDrops.length=0;
   $('title').classList.add('hidden');hudEl.classList.remove('hidden');
   G.state='play';
   const P=player;P.hp=P.maxhp;P.dead=false;
@@ -3196,9 +3198,9 @@ function padKey(k){
   return ({E:n.A,F:n.B,Q:n.B,H:n.X,V:n.Y,R:n.LB,T:n.RB})[k]||k;
 }
 function padLabelHTML(v){
-  if(pad.touch)return v.replace(/<b>LMB<\/b>/g,'<b>FIRE</b>').replace(/<b>RMB<\/b>/g,'<b>ALT</b>').replace(/<b>R<\/b>switch/g,'<b>SWAP</b>').replace(/<b>F<\/b>Leave/g,'<b>LEAVE</b>').replace(/<span style="opacity:\.7">.*?<\/span>/g,'');
+  if(pad.touch)return v.replace(/<b>LMB<\/b>/g,'<b>FIRE</b>').replace(/<b>RMB<\/b>/g,'<b>ALT</b>').replace(/<b>Tab<\/b>wheel/g,'<b>WHEEL</b>').replace(/<b>F<\/b>Leave/g,'<b>LEAVE</b>').replace(/<span style="opacity:\.7">.*?<\/span>/g,'');
   const n=pad.ps?PADN.ps:PADN.xbox;
-  return v.replace(/<b>LMB<\/b>/g,'<b>'+n.RT+'</b>').replace(/<b>RMB<\/b>/g,'<b>'+n.LT+'</b>').replace(/<b>R<\/b>switch/g,'<b>'+n.LB+'</b>switch').replace(/<b>F<\/b>Leave/g,'<b>'+n.B+'</b>Leave').replace(/1-9 swap[^<]*/g,n.LB+'/'+n.RB+' swap');
+  return v.replace(/<b>LMB<\/b>/g,'<b>'+n.RT+'</b>').replace(/<b>RMB<\/b>/g,'<b>'+n.LT+'</b>').replace(/<b>Tab<\/b>wheel/g,'<b>'+n.LB+'</b>wheel').replace(/<b>F<\/b>Leave/g,'<b>'+n.B+'</b>Leave').replace(/Tab wheel/g,n.LB+'/'+n.RB+' swap');
 }
 function padRange(){return G.deck?230:(player.ship?420:300);}
 function mouseWorld(cx,cy,z,bx,by,R){
@@ -3307,13 +3309,12 @@ function padPoll(dt){
   const R=padRange();
   if(rm>DZ){pad.ang=Math.atan2(ry,rx);pad.dist=Math.max(50,Math.min(1,rm)*R);pad.rsT=G.t;}
   else if(lm>0.5&&(!player.ship||G.deck)&&G.t-pad.rsT>0.9){pad.ang=Math.atan2(ly,lx);pad.dist=R*0.55;}
+  if(WHEEL.padStep(press2,b,rx,ry,lx,ly))return;
   // actions
   if(press2(0))onKey('KeyE');
   if(press2(1)){if(player.ship)onKey('KeyF');else if(player.horse)onKey('KeyQ');}
   if(press2(2))onKey('KeyH');
   if(press2(3))onKey('KeyV');
-  WHEEL.padStep(press2(4),b(4),rx,ry,lx,ly);
-  if(press2(5))onKey('KeyT');
   if(b(12))G.zoomMul=clamp(G.zoomMul*(1+dt*0.9),0.6,1.6);
   if(b(13))G.zoomMul=clamp(G.zoomMul*(1-dt*0.9),0.6,1.6);
 }
@@ -3764,7 +3765,9 @@ function updateScene(dt){
     }
     b.life-=dt;if(b.life<=0)b.dead=true;
   }
+  for(const b of D.bullets)if(b.dead&&b.knife)knifeLand(D,b);
   compact(D.bullets,b=>!b.dead);
+  knifeStep(D,D.knives,p.x,p.y,dt,true);
   for(const b of D.bombs){
     b.t-=dt;
     if(b.fl>0){b.fl-=dt;const nx=b.x+b.vx*dt,ny=b.y+b.vy*dt;if(gridHit(D,nx,ny,3)){b.vx*=-0.2;b.vy*=-0.2;b.fl=0;}else{b.x=nx;b.y=ny;}}
@@ -4121,6 +4124,7 @@ function renderScene(){
     if(d>24){ctx.save();ctx.setLineDash([2,9]);ctx.lineCap='round';ctx.lineWidth=1.8;ctx.strokeStyle='rgba(255,255,255,.5)';ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(mouse.wx,mouse.wy);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1.6;ctx.strokeStyle='rgba(255,255,255,.85)';ctx.beginPath();ctx.arc(mouse.wx,mouse.wy,6,0,TAU);ctx.stroke();ctx.restore();}
   }
   for(const b of D.bullets){ctx.strokeStyle=b.col||(b.own==='p'?'rgba(255,240,170,.9)':'rgba(255,200,120,.9)');ctx.lineWidth=b.knife?2.6:(b.own==='e'&&b.dmg>=14?3.2:2);const tl=b.knife?0.018:0.025;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.vx*tl,b.y-b.vy*tl);ctx.stroke();}
+  if(D.knives)for(const k of D.knives)drawKnife(k);
   for(const b of D.bombs){ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(b.x,b.y,5,0,TAU);ctx.fill();ctx.fillStyle=(Math.floor(G.t*14)%2)?'#ffb347':'#ff5a2a';ctx.beginPath();ctx.arc(b.x+3,b.y-5,2.2,0,TAU);ctx.fill();}
   drawParts(1);
   // darkness with light holes
@@ -4707,7 +4711,7 @@ function sceneHUD(){
   const D=G.deck,P=player,gw=WEAP[G.gun];
   hullRow.style.display='none';
   setTxt(goldTxt,'gold',String(G.gold));
-  const extra=D.scene==='prison'?'<span style="opacity:.8">Pebbles <b>&times;'+(D.pebbles||0)+'</b> (RMB'+(D.unarmed?'':' / G')+') &nbsp; <b>Shift</b> creep</span>':'<span style="opacity:.7">1-9 swap &nbsp; <b>E</b> interact</span>';
+  const extra=D.scene==='prison'?'<span style="opacity:.8">Pebbles <b>&times;'+(D.pebbles||0)+'</b> (RMB'+(D.unarmed?'':' / G')+') &nbsp; <b>Shift</b> creep</span>':'<span style="opacity:.7">Tab wheel &nbsp; <b>E</b> interact</span>';
   setHTML(weaponEl,'w',D.unarmed?'<span><b>Unarmed</b> your weapons were confiscated</span>'+extra:'<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span>'+extra);
   if(hc.pr!==''){hc.pr='';promptEl.innerHTML='';promptEl.classList.add('hidden');}
   steedHudEl.classList.add('hidden');
@@ -5061,7 +5065,6 @@ function crewCall(f){
     };
     b.addEventListener('click',()=>{b.blur();build();show(true);});
     window.__crewReset=()=>{try{panel.classList.add('hidden');mainBtns().forEach(x=>x.classList.remove('hidden'));}catch(e){}};
-    if(after&&after.parentNode)after.parentNode.insertBefore(b,after.nextSibling);else host.appendChild(b);
   }catch(e){}
 })();
 
@@ -5259,12 +5262,39 @@ function crewCall(f){
   if(sess&&status==='Signed in.')setTimeout(open,1300);
 })();
 
-/* ---- weapon wheel (hold Tab / middle mouse / hold LB; tap a slice on touch) ---- */
-const WHEEL={open:false,src:'',items:[],sel:-1,mx:0,my:0,padT:0,padActive:false,padOpened:false,root:null,svg:null};
+/* ---- weapon wheel: weapons + a Commands sub-wheel (crew, steed, tonic) ---- */
+const WHEEL={open:false,src:'',level:'main',sticky:false,items:[],sel:-1,svg:null,root:null,padOpened:false};
+const knifeDrops=[];
+function knifeLand(D,b){
+  let x=b.x,y=b.y;const L=Math.hypot(b.vx,b.vy)||1,ux=b.vx/L,uy=b.vy/L;
+  const blk=(x,y)=>D?(D.scene?gridHit(D,x,y,1):(!deckIn(D,x,y)||deckHit(D,x,y,1))):tileAt(x,y)>=8;
+  for(let i=0;i<10&&blk(x,y);i++){x-=ux*4;y-=uy*4;}
+  if(!D&&tileAt(x,y)===TL.DEEP){addP(x,y,0,0,0.5,6,'rgba(255,255,255,.8)',{grow:30,ring:true,layer:0});return;}
+  const arr=D?(D.knives||(D.knives=[])):knifeDrops;
+  arr.push({x,y,a:Math.atan2(b.vy,b.vx)+rr(-0.35,0.35),t:0});if(arr.length>40)arr.shift();
+}
+function knifeStep(D,arr,px,py,dt,canPick){
+  if(!arr||!arr.length)return;
+  for(const k of arr){k.t+=dt;if(k.t>240){k.dead=true;continue;}
+    if(canPick&&G.ammo.knives<AMMO_MAX.knives&&Math.hypot(k.x-px,k.y-py)<22){G.ammo.knives++;k.dead=true;sfx('ui');addP(k.x,k.y,0,0,0.35,5,'rgba(230,240,255,.9)',{grow:16,ring:true,layer:0});}}
+  compact(arr,k=>!k.dead);
+}
+function drawKnife(k){
+  ctx.save();ctx.translate(k.x,k.y);
+  const gl=0.5+0.5*Math.sin(G.t*3+k.x*0.07);
+  ctx.fillStyle='rgba(210,230,255,'+(0.10+0.12*gl).toFixed(3)+')';ctx.beginPath();ctx.arc(0,0,10,0,TAU);ctx.fill();
+  ctx.rotate(k.a);
+  ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(1,2,8,2.2,0,0,TAU);ctx.fill();
+  ctx.strokeStyle='#5a3a1a';ctx.lineWidth=3.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(-3,0);ctx.stroke();
+  ctx.fillStyle='#e6ebf5';ctx.beginPath();ctx.moveTo(-3,-1.8);ctx.lineTo(6,-0.8);ctx.lineTo(9,0);ctx.lineTo(6,1.2);ctx.lineTo(-3,1.8);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,'+(0.3+0.6*gl).toFixed(3)+')';ctx.fillRect(1,-0.6,4,1);
+  ctx.restore();
+}
 (function(){
-  let root=null,tx=null;
   const NS='http://www.w3.org/2000/svg';
-  function buildItems(){
+  let wrap=null;
+  const P0=()=>player;
+  function weaponItems(){
     const P=player,items=[];
     if(P.ship){
       const l=specials(P.ship),cur=(P.ship.sel|0)%Math.max(1,l.length);
@@ -5273,13 +5303,29 @@ const WHEEL={open:false,src:'',items:[],sel:-1,mx:0,my:0,padT:0,padActive:false,
       for(const k of WORDER){
         if(!G.owned[k])continue;const w=WEAP[k];
         const isCur=(w.cat==='melee'?G.melee:G.gun)===k;
-        let sub=w.cat==='melee'?'melee':(w.ammo?(AMMO_NAME[w.ammo]||'ammo').split(' ').slice(-1)[0]+' x'+(G.ammo[w.ammo]|0):'');
-        items.push({kind:'weap',k,label:w.n,sub,cur:isCur,melee:w.cat==='melee'});
+        const sub=w.cat==='melee'?'melee':(w.ammo?(AMMO_NAME[w.ammo]||'ammo').split(' ').slice(-1)[0]+' x'+(G.ammo[w.ammo]|0):'');
+        items.push({kind:'weap',k,label:w.n,sub,cur:isCur});
       }
     }
+    items.push({kind:'sub',label:'Commands',sub:'crew, steed, tonic',cur:false,accent:true});
     return items;
   }
-  function geom(){const S=Math.min(VW,VH)*0.88;return {S,cx:S/2,cy:S/2,R:S*0.47,r:S*0.17};}
+  function cmdItems(){
+    const P=player,items=[];
+    const pier=nearestPier(P.x,P.y);
+    for(const f of ships.filter(q=>q.own&&!q.dead)){
+      let why=null;
+      if(G.deck||P.dead)why='not now';else if(f===P.ship)why='you are aboard';
+      else if(pier&&dist(f.x,f.y,pier.px*TS,pier.wy*TS)<260)why='already in port';
+      else if(G.gold<CREW_FEE)why='needs '+CREW_FEE+'g';
+      items.push({kind:'run',label:'Call '+nm(f),sub:why||('crew sails her in, '+CREW_FEE+'g'),disabled:!!why,why:why,run(){crewCall(f);}});
+    }
+    for(const w of G.wrecks)items.push({kind:'run',label:w.name||ST[w.type].name,sub:'wrecked: shipyard',disabled:true,why:'Only a shipyard can raise her.',run(){}});
+    if(G.steed){const h=G.steed;items.push({kind:'run',label:h.follow&&!h.down?'Steed: stay':'Call steed',sub:P.ship?'ashore only':h.name,disabled:!!P.ship||!!G.deck,why:'Come ashore first.',run(){whistle();}});}
+    items.push({kind:'run',label:'Tonic x'+(G.items.tonic|0),sub:'heal you or your horse',disabled:!(G.items.tonic>0)||!!G.deck,why:'No tonic left.',run(){useTonic();}});
+    return items;
+  }
+  const geom=()=>{const S=Math.min(VW,VH)*0.88;return {S,cx:S/2,cy:S/2,R:S*0.47,r:S*0.17};};
   const pt=(g,a,rad)=>[g.cx+rad*Math.sin(a),g.cy-rad*Math.cos(a)];
   function sector(g,a0,a1,R,r){
     const [x0,y0]=pt(g,a0,R),[x1,y1]=pt(g,a1,R),[x2,y2]=pt(g,a1,r),[x3,y3]=pt(g,a0,r),big=(a1-a0)>Math.PI?1:0;
@@ -5288,99 +5334,117 @@ const WHEEL={open:false,src:'',items:[],sel:-1,mx:0,my:0,padT:0,padActive:false,
   function make(tag,at,parent){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(parent)parent.appendChild(e);return e;}
   function render(){
     const g=geom(),n=WHEEL.items.length;
-    root.style.width=g.S+'px';root.style.height=g.S+'px';
+    WHEEL.root.style.width=g.S+'px';WHEEL.root.style.height=g.S+'px';
     WHEEL.svg.setAttribute('viewBox','0 0 '+g.S+' '+g.S);WHEEL.svg.setAttribute('width',g.S);WHEEL.svg.setAttribute('height',g.S);
     WHEEL.svg.innerHTML='';
     const step=Math.PI*2/n,gap=n>1?0.03:0;
     const bg=make('circle',{cx:g.cx,cy:g.cy,r:g.R+8,fill:'rgba(8,16,26,.55)'},WHEEL.svg);bg.style.pointerEvents='none';
     WHEEL.items.forEach((it,i)=>{
-      const mid=i*step,a0=mid-step/2+gap,a1=mid+step/2-gap;
-      const sel=i===WHEEL.sel;
-      const path=n===1?null:make('path',{d:sector(g,a0,a1,g.R,g.r),fill:sel?'#e8b43f':(it.cur?'#5a4220':'#2a2218'),stroke:it.cur?'#f4c542':'#8a6a3a','stroke-width':it.cur?3:1.5,opacity:sel?1:0.92},WHEEL.svg);
-      if(!path){make('circle',{cx:g.cx,cy:g.cy,r:g.R,fill:sel?'#e8b43f':'#2a2218',stroke:'#f4c542','stroke-width':3},WHEEL.svg);}
-      const hit=path||WHEEL.svg.lastChild;hit.style.pointerEvents='auto';hit.style.cursor='pointer';
-      hit.addEventListener('pointerenter',()=>{if(WHEEL.sel!==i){WHEEL.sel=i;render();}});
-      hit.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();WHEEL.sel=i;WHEEL.padOpened=true;apply();close();});
+      const mid=i*step,sel=i===WHEEL.sel,dis=!!it.disabled;
+      let fill=dis?'#1c1812':(sel?'#e8b43f':(it.cur?'#5a4220':(it.accent?'#243448':'#2a2218')));
+      let hit;
+      if(n===1)hit=make('circle',{cx:g.cx,cy:g.cy,r:g.R,fill,stroke:'#f4c542','stroke-width':3},WHEEL.svg);
+      else hit=make('path',{d:sector(g,mid-step/2+gap,mid+step/2-gap,g.R,g.r),fill,stroke:it.cur?'#f4c542':(it.accent?'#6f8fb5':'#8a6a3a'),'stroke-width':it.cur?3:1.5,opacity:sel?1:0.92},WHEEL.svg);
+      hit.style.pointerEvents='auto';hit.style.cursor=dis?'not-allowed':'pointer';
+      hit.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();WHEEL.sel=i;finish();});
       const [lx,ly]=n===1?[g.cx,g.cy-g.R*0.6]:pt(g,mid,(g.R+g.r)/2);
-      const t=make('text',{x:lx,y:ly,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(12,g.S*0.027),'font-weight':700,fill:sel?'#1a1208':'#fff3d2'},WHEEL.svg);t.textContent=it.label;t.style.pointerEvents='none';
-      const t2=make('text',{x:lx,y:ly+Math.max(14,g.S*0.03),'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:sel?'#3a2a10':'#c9b685'},WHEEL.svg);t2.textContent=it.sub+(it.cur?'  (equipped)':'');t2.style.pointerEvents='none';
+      const t=make('text',{x:lx,y:ly,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(12,g.S*0.027),'font-weight':700,fill:dis?'#7a6e55':(sel?'#1a1208':'#fff3d2')},WHEEL.svg);t.textContent=it.label;t.style.pointerEvents='none';
+      const t2=make('text',{x:lx,y:ly+Math.max(14,g.S*0.03),'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:dis?'#6a5f48':(sel?'#3a2a10':'#c9b685')},WHEEL.svg);t2.textContent=it.sub+(it.cur?'  (equipped)':'');t2.style.pointerEvents='none';
     });
-    const c=make('circle',{cx:g.cx,cy:g.cy,r:g.r-6,fill:'rgba(8,16,26,.9)',stroke:'#8a6a3a','stroke-width':2},WHEEL.svg);c.style.pointerEvents='none';
+    const c=make('circle',{cx:g.cx,cy:g.cy,r:g.r-6,fill:'rgba(8,16,26,.92)',stroke:'#8a6a3a','stroke-width':2},WHEEL.svg);c.style.cursor='pointer';
+    c.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();back();});
     const it=WHEEL.items[WHEEL.sel];
-    const h1=make('text',{x:g.cx,y:g.cy-4,'text-anchor':'middle','font-family':"'Pirata One',Lora,serif",'font-size':Math.max(15,g.S*0.034),fill:'#f4c542'},WHEEL.svg);h1.textContent=it?it.label:(P0().ship?'Ship special':'Weapons');h1.style.pointerEvents='none';
-    const h2=make('text',{x:g.cx,y:g.cy+g.S*0.03,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:'#c9b685'},WHEEL.svg);h2.textContent=it?'release to equip':'aim at a slice';h2.style.pointerEvents='none';
-  }
-  const P0=()=>player;
-  function open(src){
-    if(WHEEL.open||G.state!=='play'||G.paused||G.shop||G.dlg||G.bigmap||player.dead)return false;
-    const items=buildItems();
-    if(items.length<2){toast(player.ship?'Fit a second ship special to use the wheel.':'You only carry one weapon.','bad');return false;}
-    WHEEL.items=items;WHEEL.src=src;WHEEL.open=true;WHEEL.sel=-1;WHEEL.padOpened=true;
-    mouse.down=false;mouse.rdown=false;
-    if(!root)ensure();
-    root.parentNode.style.display='flex';render();sfx('ui');return true;
-  }
-  function apply(){
-    const it=WHEEL.items[WHEEL.sel];if(!it)return;
-    if(it.kind==='spec'){if(player.ship)player.ship.sel=it.idx;}
-    else{const i=WORDER.indexOf(it.k);if(i>=0){const w=WEAP[it.k];if(w.cat==='melee')G.melee=it.k;else G.gun=it.k;}}
-    sfx('ui');
-  }
-  function close(){
-    if(!WHEEL.open)return;WHEEL.open=false;WHEEL.sel=-1;if(root&&root.parentNode)root.parentNode.style.display='none';
+    const cmd=WHEEL.level==='cmd';
+    const h1=make('text',{x:g.cx,y:g.cy-4,'text-anchor':'middle','font-family':"'Pirata One',Lora,serif",'font-size':Math.max(15,g.S*0.034),fill:'#f4c542'},WHEEL.svg);h1.textContent=it?it.label:(cmd?'Commands':(P0().ship?'Ship special':'Weapons'));h1.style.pointerEvents='none';
+    const h2=make('text',{x:g.cx,y:g.cy+g.S*0.03,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:'#c9b685'},WHEEL.svg);
+    h2.textContent=it?(it.disabled?(it.why||'unavailable'):(WHEEL.sticky?'click or Enter':'release to use')):(WHEEL.sticky?(cmd?'centre: back':'centre: close'):'aim at a slice');h2.style.pointerEvents='none';
   }
   function ensure(){
     const stage=document.getElementById('pause').parentNode;
-    const wrap=document.createElement('div');wrap.id='wheelWrap';
+    wrap=document.createElement('div');wrap.id='wheelWrap';
     wrap.style.cssText='position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:55;pointer-events:none;background:rgba(3,14,26,.28)';
-    root=document.createElement('div');root.style.cssText='position:relative;pointer-events:none';
+    const root=document.createElement('div');root.style.cssText='position:relative;pointer-events:none';
     WHEEL.svg=document.createElementNS(NS,'svg');WHEEL.svg.style.cssText='display:block;overflow:visible;touch-action:none';
-    root.appendChild(WHEEL.svg);wrap.appendChild(root);stage.appendChild(wrap);WHEEL.root=wrap;
+    root.appendChild(WHEEL.svg);wrap.appendChild(root);stage.appendChild(wrap);WHEEL.root=root;WHEEL.wrap=wrap;
   }
-  function pick(dx,dy,min){
-    const n=WHEEL.items.length;if(!n)return -1;
-    if(Math.hypot(dx,dy)<min)return -1;
-    const a=Math.atan2(dx,-dy),step=Math.PI*2/n;
-    let ang=a<0?a+Math.PI*2:a;return Math.floor((ang+step/2)/step)%n;
+  function open(src,sticky){
+    if(WHEEL.open||G.state!=='play'||G.paused||G.shop||G.dlg||G.bigmap||player.dead)return false;
+    if(G.deck&&G.deck.unarmed){toast('You have no weapons here.','bad');return false;}
+    WHEEL.items=weaponItems();WHEEL.level='main';WHEEL.src=src;WHEEL.sticky=!!sticky;WHEEL.open=true;WHEEL.sel=-1;
+    mouse.down=false;mouse.rdown=false;
+    if(!wrap)ensure();
+    wrap.style.display='flex';render();sfx('ui');return true;
+  }
+  function close(){
+    if(!WHEEL.open)return;WHEEL.open=false;WHEEL.sel=-1;WHEEL.sticky=false;if(wrap)wrap.style.display='none';
   }
   function setSel(i){if(i!==WHEEL.sel){WHEEL.sel=i;render();}}
-  WHEEL.open_=open;WHEEL.apply=apply;WHEEL.close=close;WHEEL.pick=pick;WHEEL.setSel=setSel;
-  // keyboard: hold Tab
-  addEventListener('keydown',e=>{if(e.code==='Tab'&&!e.repeat&&!(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName))){e.preventDefault();open('kb');}else if(e.code==='Tab')e.preventDefault();else if(e.code==='Escape'&&WHEEL.open){close();}});
-  addEventListener('keyup',e=>{if(e.code==='Tab'&&WHEEL.open&&WHEEL.src==='kb'){apply();close();}});
-  // mouse: hold the middle button, or move over slices
+  function pick(dx,dy,min){
+    const n=WHEEL.items.length;if(!n||Math.hypot(dx,dy)<min)return -1;
+    const a=Math.atan2(dx,-dy),step=Math.PI*2/n;const ang=a<0?a+Math.PI*2:a;return Math.floor((ang+step/2)/step)%n;
+  }
+  // use the highlighted slice. Hold-style input closes afterwards; entering Commands keeps the wheel open.
+  function finish(){
+    const it=WHEEL.items[WHEEL.sel];
+    if(!it){if(!WHEEL.sticky)close();return;}
+    if(it.disabled){sfx('no');if(it.why)toast(it.why.charAt(0).toUpperCase()+it.why.slice(1),'bad');if(!WHEEL.sticky)close();return;}
+    if(it.kind==='sub'){WHEEL.level='cmd';WHEEL.items=cmdItems();WHEEL.sticky=true;WHEEL.sel=-1;render();sfx('ui');return;}
+    if(it.kind==='spec'){if(player.ship)player.ship.sel=it.idx;}
+    else if(it.kind==='weap'){const w=WEAP[it.k];if(w.cat==='melee')G.melee=it.k;else G.gun=it.k;}
+    else if(it.kind==='run')it.run();
+    sfx('ui');close();
+  }
+  function back(){
+    if(WHEEL.level==='cmd'){WHEEL.level='main';WHEEL.items=weaponItems();WHEEL.sel=-1;render();sfx('ui');}
+    else if(WHEEL.sticky)close();
+  }
+  WHEEL.close=close;WHEEL.finish=finish;WHEEL.back=back;WHEEL.open_=open;WHEEL.setSel=setSel;WHEEL.pick=pick;
+  // keyboard: hold Tab, move the mouse, release. Enter confirms inside Commands.
+  addEventListener('keydown',e=>{
+    if(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName))return;
+    if(e.code==='Tab'){e.preventDefault();if(e.repeat)return;if(WHEEL.open&&WHEEL.sticky)close();else open('kb',false);}
+    else if(e.code==='Enter'&&WHEEL.open&&WHEEL.sticky){e.preventDefault();finish();}
+  });
+  addEventListener('keyup',e=>{if(e.code==='Tab'&&WHEEL.open&&WHEEL.src==='kb'&&!WHEEL.sticky)finish();});
   cv.addEventListener('mousedown',e=>{
-    if(WHEEL.open){e.stopImmediatePropagation();e.preventDefault();if(e.button===0||e.button===1){if(WHEEL.sel>=0){apply();close();}}return;}
-    if(e.button===1&&G.state==='play'){e.preventDefault();open('mouse');}
+    if(WHEEL.open){e.stopImmediatePropagation();e.preventDefault();
+      if(e.button===0||e.button===1){if(WHEEL.sel>=0)finish();else if(WHEEL.sticky)back();}
+      return;}
+    if(e.button===1&&G.state==='play'){e.preventDefault();open('mouse',false);}
   },true);
-  addEventListener('mouseup',e=>{if(e.button===1&&WHEEL.open&&WHEEL.src==='mouse'){apply();close();}});
+  addEventListener('mouseup',e=>{if(e.button===1&&WHEEL.open&&WHEEL.src==='mouse'&&!WHEEL.sticky)finish();});
   addEventListener('mousemove',e=>{
-    if(!WHEEL.open||WHEEL.src==='pad')return;
+    if(!WHEEL.open||WHEEL.src==='pad'||WHEEL.src==='touch')return;
     setSel(pick(e.clientX-innerWidth/2,e.clientY-innerHeight/2,Math.min(VW,VH)*0.06));
   });
   addEventListener('blur',()=>close());
-  // controller / touch SWAP button: tap = old cycle, hold = wheel
-  WHEEL.padStep=function(pressed,held,rx,ry,lx,ly){
-    const now=performance.now();
-    if(pressed){WHEEL.padT=now;WHEEL.padActive=true;WHEEL.padOpened=false;}
-    if(held&&WHEEL.padActive&&!WHEEL.open&&now-WHEEL.padT>220){if(!open('pad'))WHEEL.padActive=false,WHEEL.padOpened=true;}
-    if(WHEEL.open&&WHEEL.src==='pad'){
-      const rm=Math.hypot(rx,ry),lm=Math.hypot(lx,ly);
-      const sx=rm>0.4?rx:(lm>0.4?lx:0),sy=rm>0.4?ry:(lm>0.4?ly:0);
-      if(sx||sy)setSel(pick(sx,sy,0.01));
-      pad.fm=0;padMouse('down',false);padMouse('rdown',false);
+  // controller: hold LB, pick with a stick, release. Touch: tap WHEEL,knifeDrops, tap a slice.
+  WHEEL.padStep=function(press,b,rx,ry,lx,ly){
+    if(!WHEEL.open){
+      if(press(4)){open(pad.touch?'touch':'pad',!!pad.touch);return true;}
+      return false;
     }
-    if(!held&&WHEEL.padActive){
-      WHEEL.padActive=false;
-      if(WHEEL.open&&WHEEL.src==='pad'){apply();close();}
-      else if(!WHEEL.padOpened)onKey('KeyR');
-    }
+    pad.fm=0;padMouse('down',false);padMouse('rdown',false);
+    const rm=Math.hypot(rx,ry),lm=Math.hypot(lx,ly);
+    const sx=rm>0.4?rx:(lm>0.4?lx:0),sy=rm>0.4?ry:(lm>0.4?ly:0);
+    if(sx||sy)setSel(pick(sx,sy,0.01));
+    if(WHEEL.sticky){
+      if(press(0))finish();
+      else if(press(1)||press(4)){if(WHEEL.level==='cmd')back();else close();}
+    }else if(WHEEL.src==='pad'&&!b(4))finish();
+    return true;
   };
-  // help text
+  // old swap controls are gone: tidy the help text
   try{
     const ctrl=document.querySelector('#title .ctrl');
-    if(ctrl){const a=document.createElement('div');a.textContent='Weapon wheel';const b=document.createElement('div');b.innerHTML='Hold <span class="kbd">Tab</span> or middle mouse, move to a slice, release';ctrl.appendChild(a);ctrl.appendChild(b);}
-    const ph=document.getElementById('padHelp');if(ph)ph.innerHTML=ph.innerHTML.replace('LB / L1 switch ranged or special','LB / L1 tap switches ranged or special, hold opens the weapon wheel (aim with a stick, release to equip)');
+    if(ctrl){
+      for(const d of [...ctrl.children]){if(/^Swap weapons/.test(d.textContent)){const nx=d.nextElementSibling;d.remove();if(nx)nx.remove();break;}}
+      const a=document.createElement('div');a.textContent='Weapon wheel and commands';const b=document.createElement('div');b.innerHTML='Hold <span class="kbd">Tab</span> or middle mouse, move to a slice, release. <b>Commands</b> holds crew, steed and tonic.';ctrl.appendChild(a);ctrl.appendChild(b);
+    }
+    const ph=document.getElementById('padHelp');if(ph)ph.innerHTML=ph.innerHTML.replace('LB / L1 switch ranged or special','LB / L1 hold opens the weapon wheel (aim with a stick, release to use; pick Commands for crew, steed and tonic)').replace(' &middot; RB / R1 switch melee','');
+    const m=document.querySelector('.tb[data-b="5"]');if(m)m.style.display='none';
+    const sw=document.querySelector('.tb[data-b="4"]');if(sw)sw.textContent='WHEEL';
+    const cb=document.getElementById('crewBtn');if(cb)cb.remove();
   }catch(e){}
 })();
 
@@ -5422,7 +5486,7 @@ function boot(){
   }else $('startBtn').textContent='Set Sail';
   $('startBtn').disabled=false;
   G.ready=true;
-  window.__bb={STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,WHEEL,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
+  window.__bb={STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,WHEEL,knifeDrops,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
   requestAnimationFrame(frame);
 }
 setTimeout(boot,40);
