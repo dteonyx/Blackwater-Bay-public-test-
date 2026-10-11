@@ -1,9 +1,7 @@
 # Blackwater Bay: installable web app
 
-## Put it online (GitHub Pages)
-1. Create a repo (or use an existing one) and copy everything in this folder to its root, keeping the `.github` folder.
-2. Repo Settings > Pages > Build and deployment > Source: **GitHub Actions**.
-3. Push to `main`. The "Deploy Blackwater Bay" action runs and prints your URL: `https://YOURNAME.github.io/REPO/`.
+## Hosting
+This repo is served by GitHub Pages: Settings > Pages > Deploy from a branch > `main` / root. Every push to `main` redeploys.
 
 ## Install it
 - **Chromebook / Windows / Mac (Chrome or Edge):** open the URL, click the install icon at the right of the address bar (or menu > Install Blackwater Bay).
