@@ -5136,7 +5136,7 @@ function crewCall(f){
     const tk=await token();if(!tk)throw new Error('signed out');
     const r=await fetch(URL0+'/rest/v1/'+path,Object.assign({headers:Object.assign(hdr(tk),(opt&&opt.prefer)?{'Prefer':opt.prefer}:{})},opt&&{method:opt.method,body:opt.body}));
     if(!r.ok){let m='';try{const j=await r.json();m=j.message||j.hint||j.error_description||j.msg||'';}catch(e){}throw new Error('HTTP '+r.status+(m?': '+String(m).slice(0,140):''));}
-    return r.status===204?null:r.json();
+    const tx=await r.text();if(!tx)return null;try{return JSON.parse(tx);}catch(e){return null;}
   }
   async function getCloud(){
     const rows=await api('saves?select=data,updated_at&user_id=eq.'+sess.uid+'&slot=eq.'+SLOT);
