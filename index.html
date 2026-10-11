@@ -5190,14 +5190,16 @@ function crewCall(f){
     return ok;
   };
   // UI
-  const ov=document.createElement('div');ov.id='cloudOv';ov.className='overlay hidden';ov.style.zIndex=60;
-  const card=document.createElement('div');card.className='parch';card.style.textAlign='center';ov.appendChild(card);
+  let ov=null,card=null,draw=()=>{},open=()=>{};
+  try{
+  ov=document.createElement('div');ov.id='cloudOv';ov.className='overlay hidden';ov.style.zIndex=60;
+  card=document.createElement('div');card.className='parch';card.style.textAlign='center';ov.appendChild(card);
   (document.getElementById('pause').parentNode).appendChild(ov);
   const mk=(txt,fn,ghost)=>{const b=document.createElement('button');b.className='btn'+(ghost?' ghost':'');b.style.cssText='display:block;width:100%;margin-top:10px';b.textContent=txt;b.addEventListener('click',()=>{b.blur();fn();});return b;};
   const inp=(ph,type)=>{const i=document.createElement('input');i.type=type||'text';i.placeholder=ph;i.autocomplete=type==='email'?'email':'one-time-code';i.style.cssText='display:block;width:100%;margin-top:10px;padding:11px;font:inherit;font-size:17px;border:2px solid #6b4a2b;border-radius:6px;background:#fff8e1;color:#2b1a0c;box-sizing:border-box;user-select:text;-webkit-user-select:text';
     for(const ev of ['keydown','keyup','keypress'])i.addEventListener(ev,e=>{e.stopPropagation();});return i;};
   let emailV='',codeV='',sent=false;
-  function draw(){
+  draw=function(){
     card.innerHTML='';
     const h=document.createElement('h2');h.textContent='Cloud save';h.style.fontSize='32px';card.appendChild(h);
     const p=(t,st)=>{const e=document.createElement('p');e.textContent=t;if(st)e.style.cssText=st;card.appendChild(e);return e;};
@@ -5239,7 +5241,7 @@ function crewCall(f){
     }
     card.appendChild(mk('Close',()=>{ov.classList.add('hidden');},true));
   }
-  const open=()=>{status=status||'';draw();ov.classList.remove('hidden');};
+  open=()=>{status=status||'';draw();ov.classList.remove('hidden');};
   window.__cloudOpen=open;
   try{
     const pm=document.querySelector('#pause .parch');
@@ -5249,6 +5251,7 @@ function crewCall(f){
     const sb=document.getElementById('startBtn');
     const tb=document.createElement('button');tb.className='btn ghost';tb.id='cloudBtnT';tb.style.marginTop='10px';tb.textContent='Cloud save';tb.addEventListener('click',()=>{tb.blur();open();});
     if(sb&&sb.parentNode)sb.parentNode.insertBefore(tb,sb.nextSibling);
+  }catch(e){}
   }catch(e){}
   window.__cloud={upload,download,getCloud,putCloud,state:()=>({sess,status}),setSess};
   if(sess){setTimeout(()=>{if(sess)onSignedIn();},1200);}
