@@ -3312,7 +3312,7 @@ function padPoll(dt){
   if(press2(1)){if(player.ship)onKey('KeyF');else if(player.horse)onKey('KeyQ');}
   if(press2(2))onKey('KeyH');
   if(press2(3))onKey('KeyV');
-  if(press2(4))onKey('KeyR');
+  WHEEL.padStep(press2(4),b(4),rx,ry,lx,ly);
   if(press2(5))onKey('KeyT');
   if(b(12))G.zoomMul=clamp(G.zoomMul*(1+dt*0.9),0.6,1.6);
   if(b(13))G.zoomMul=clamp(G.zoomMul*(1-dt*0.9),0.6,1.6);
@@ -5259,8 +5259,134 @@ function crewCall(f){
   if(sess&&status==='Signed in.')setTimeout(open,1300);
 })();
 
+/* ---- weapon wheel (hold Tab / middle mouse / hold LB; tap a slice on touch) ---- */
+const WHEEL={open:false,src:'',items:[],sel:-1,mx:0,my:0,padT:0,padActive:false,padOpened:false,root:null,svg:null};
+(function(){
+  let root=null,tx=null;
+  const NS='http://www.w3.org/2000/svg';
+  function buildItems(){
+    const P=player,items=[];
+    if(P.ship){
+      const l=specials(P.ship),cur=(P.ship.sel|0)%Math.max(1,l.length);
+      l.forEach((k,i)=>items.push({kind:'spec',idx:i,label:MODINFO[k].n,sub:'ship special',cur:i===cur}));
+    }else{
+      for(const k of WORDER){
+        if(!G.owned[k])continue;const w=WEAP[k];
+        const isCur=(w.cat==='melee'?G.melee:G.gun)===k;
+        let sub=w.cat==='melee'?'melee':(w.ammo?(AMMO_NAME[w.ammo]||'ammo').split(' ').slice(-1)[0]+' x'+(G.ammo[w.ammo]|0):'');
+        items.push({kind:'weap',k,label:w.n,sub,cur:isCur,melee:w.cat==='melee'});
+      }
+    }
+    return items;
+  }
+  function geom(){const S=Math.min(VW,VH)*0.88;return {S,cx:S/2,cy:S/2,R:S*0.47,r:S*0.17};}
+  const pt=(g,a,rad)=>[g.cx+rad*Math.sin(a),g.cy-rad*Math.cos(a)];
+  function sector(g,a0,a1,R,r){
+    const [x0,y0]=pt(g,a0,R),[x1,y1]=pt(g,a1,R),[x2,y2]=pt(g,a1,r),[x3,y3]=pt(g,a0,r),big=(a1-a0)>Math.PI?1:0;
+    return 'M'+x0+' '+y0+' A'+R+' '+R+' 0 '+big+' 1 '+x1+' '+y1+' L'+x2+' '+y2+' A'+r+' '+r+' 0 '+big+' 0 '+x3+' '+y3+' Z';
+  }
+  function make(tag,at,parent){const e=document.createElementNS(NS,tag);for(const k in at)e.setAttribute(k,at[k]);if(parent)parent.appendChild(e);return e;}
+  function render(){
+    const g=geom(),n=WHEEL.items.length;
+    root.style.width=g.S+'px';root.style.height=g.S+'px';
+    WHEEL.svg.setAttribute('viewBox','0 0 '+g.S+' '+g.S);WHEEL.svg.setAttribute('width',g.S);WHEEL.svg.setAttribute('height',g.S);
+    WHEEL.svg.innerHTML='';
+    const step=Math.PI*2/n,gap=n>1?0.03:0;
+    const bg=make('circle',{cx:g.cx,cy:g.cy,r:g.R+8,fill:'rgba(8,16,26,.55)'},WHEEL.svg);bg.style.pointerEvents='none';
+    WHEEL.items.forEach((it,i)=>{
+      const mid=i*step,a0=mid-step/2+gap,a1=mid+step/2-gap;
+      const sel=i===WHEEL.sel;
+      const path=n===1?null:make('path',{d:sector(g,a0,a1,g.R,g.r),fill:sel?'#e8b43f':(it.cur?'#5a4220':'#2a2218'),stroke:it.cur?'#f4c542':'#8a6a3a','stroke-width':it.cur?3:1.5,opacity:sel?1:0.92},WHEEL.svg);
+      if(!path){make('circle',{cx:g.cx,cy:g.cy,r:g.R,fill:sel?'#e8b43f':'#2a2218',stroke:'#f4c542','stroke-width':3},WHEEL.svg);}
+      const hit=path||WHEEL.svg.lastChild;hit.style.pointerEvents='auto';hit.style.cursor='pointer';
+      hit.addEventListener('pointerenter',()=>{if(WHEEL.sel!==i){WHEEL.sel=i;render();}});
+      hit.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();WHEEL.sel=i;WHEEL.padOpened=true;apply();close();});
+      const [lx,ly]=n===1?[g.cx,g.cy-g.R*0.6]:pt(g,mid,(g.R+g.r)/2);
+      const t=make('text',{x:lx,y:ly,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(12,g.S*0.027),'font-weight':700,fill:sel?'#1a1208':'#fff3d2'},WHEEL.svg);t.textContent=it.label;t.style.pointerEvents='none';
+      const t2=make('text',{x:lx,y:ly+Math.max(14,g.S*0.03),'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:sel?'#3a2a10':'#c9b685'},WHEEL.svg);t2.textContent=it.sub+(it.cur?'  (equipped)':'');t2.style.pointerEvents='none';
+    });
+    const c=make('circle',{cx:g.cx,cy:g.cy,r:g.r-6,fill:'rgba(8,16,26,.9)',stroke:'#8a6a3a','stroke-width':2},WHEEL.svg);c.style.pointerEvents='none';
+    const it=WHEEL.items[WHEEL.sel];
+    const h1=make('text',{x:g.cx,y:g.cy-4,'text-anchor':'middle','font-family':"'Pirata One',Lora,serif",'font-size':Math.max(15,g.S*0.034),fill:'#f4c542'},WHEEL.svg);h1.textContent=it?it.label:(P0().ship?'Ship special':'Weapons');h1.style.pointerEvents='none';
+    const h2=make('text',{x:g.cx,y:g.cy+g.S*0.03,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:'#c9b685'},WHEEL.svg);h2.textContent=it?'release to equip':'aim at a slice';h2.style.pointerEvents='none';
+  }
+  const P0=()=>player;
+  function open(src){
+    if(WHEEL.open||G.state!=='play'||G.paused||G.shop||G.dlg||G.bigmap||player.dead)return false;
+    const items=buildItems();
+    if(items.length<2){toast(player.ship?'Fit a second ship special to use the wheel.':'You only carry one weapon.','bad');return false;}
+    WHEEL.items=items;WHEEL.src=src;WHEEL.open=true;WHEEL.sel=-1;WHEEL.padOpened=true;
+    mouse.down=false;mouse.rdown=false;
+    if(!root)ensure();
+    root.parentNode.style.display='flex';render();sfx('ui');return true;
+  }
+  function apply(){
+    const it=WHEEL.items[WHEEL.sel];if(!it)return;
+    if(it.kind==='spec'){if(player.ship)player.ship.sel=it.idx;}
+    else{const i=WORDER.indexOf(it.k);if(i>=0){const w=WEAP[it.k];if(w.cat==='melee')G.melee=it.k;else G.gun=it.k;}}
+    sfx('ui');
+  }
+  function close(){
+    if(!WHEEL.open)return;WHEEL.open=false;WHEEL.sel=-1;if(root&&root.parentNode)root.parentNode.style.display='none';
+  }
+  function ensure(){
+    const stage=document.getElementById('pause').parentNode;
+    const wrap=document.createElement('div');wrap.id='wheelWrap';
+    wrap.style.cssText='position:absolute;inset:0;display:none;align-items:center;justify-content:center;z-index:55;pointer-events:none;background:rgba(3,14,26,.28)';
+    root=document.createElement('div');root.style.cssText='position:relative;pointer-events:none';
+    WHEEL.svg=document.createElementNS(NS,'svg');WHEEL.svg.style.cssText='display:block;overflow:visible;touch-action:none';
+    root.appendChild(WHEEL.svg);wrap.appendChild(root);stage.appendChild(wrap);WHEEL.root=wrap;
+  }
+  function pick(dx,dy,min){
+    const n=WHEEL.items.length;if(!n)return -1;
+    if(Math.hypot(dx,dy)<min)return -1;
+    const a=Math.atan2(dx,-dy),step=Math.PI*2/n;
+    let ang=a<0?a+Math.PI*2:a;return Math.floor((ang+step/2)/step)%n;
+  }
+  function setSel(i){if(i!==WHEEL.sel){WHEEL.sel=i;render();}}
+  WHEEL.open_=open;WHEEL.apply=apply;WHEEL.close=close;WHEEL.pick=pick;WHEEL.setSel=setSel;
+  // keyboard: hold Tab
+  addEventListener('keydown',e=>{if(e.code==='Tab'&&!e.repeat&&!(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName))){e.preventDefault();open('kb');}else if(e.code==='Tab')e.preventDefault();else if(e.code==='Escape'&&WHEEL.open){close();}});
+  addEventListener('keyup',e=>{if(e.code==='Tab'&&WHEEL.open&&WHEEL.src==='kb'){apply();close();}});
+  // mouse: hold the middle button, or move over slices
+  cv.addEventListener('mousedown',e=>{
+    if(WHEEL.open){e.stopImmediatePropagation();e.preventDefault();if(e.button===0||e.button===1){if(WHEEL.sel>=0){apply();close();}}return;}
+    if(e.button===1&&G.state==='play'){e.preventDefault();open('mouse');}
+  },true);
+  addEventListener('mouseup',e=>{if(e.button===1&&WHEEL.open&&WHEEL.src==='mouse'){apply();close();}});
+  addEventListener('mousemove',e=>{
+    if(!WHEEL.open||WHEEL.src==='pad')return;
+    setSel(pick(e.clientX-innerWidth/2,e.clientY-innerHeight/2,Math.min(VW,VH)*0.06));
+  });
+  addEventListener('blur',()=>close());
+  // controller / touch SWAP button: tap = old cycle, hold = wheel
+  WHEEL.padStep=function(pressed,held,rx,ry,lx,ly){
+    const now=performance.now();
+    if(pressed){WHEEL.padT=now;WHEEL.padActive=true;WHEEL.padOpened=false;}
+    if(held&&WHEEL.padActive&&!WHEEL.open&&now-WHEEL.padT>220){if(!open('pad'))WHEEL.padActive=false,WHEEL.padOpened=true;}
+    if(WHEEL.open&&WHEEL.src==='pad'){
+      const rm=Math.hypot(rx,ry),lm=Math.hypot(lx,ly);
+      const sx=rm>0.4?rx:(lm>0.4?lx:0),sy=rm>0.4?ry:(lm>0.4?ly:0);
+      if(sx||sy)setSel(pick(sx,sy,0.01));
+      pad.fm=0;padMouse('down',false);padMouse('rdown',false);
+    }
+    if(!held&&WHEEL.padActive){
+      WHEEL.padActive=false;
+      if(WHEEL.open&&WHEEL.src==='pad'){apply();close();}
+      else if(!WHEEL.padOpened)onKey('KeyR');
+    }
+  };
+  // help text
+  try{
+    const ctrl=document.querySelector('#title .ctrl');
+    if(ctrl){const a=document.createElement('div');a.textContent='Weapon wheel';const b=document.createElement('div');b.innerHTML='Hold <span class="kbd">Tab</span> or middle mouse, move to a slice, release';ctrl.appendChild(a);ctrl.appendChild(b);}
+    const ph=document.getElementById('padHelp');if(ph)ph.innerHTML=ph.innerHTML.replace('LB / L1 switch ranged or special','LB / L1 tap switches ranged or special, hold opens the weapon wheel (aim with a stick, release to equip)');
+  }catch(e){}
+})();
+
 function frame(ts){
-  const dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;
+  let dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;
+  if(WHEEL.open){if(G.state!=='play'||G.paused||G.shop||G.dlg||player.dead)WHEEL.close();else dt*=0.15;}
   G.t+=dt;
   debugTick(dt);
   musicUpdate(dt);
@@ -5296,7 +5422,7 @@ function boot(){
   }else $('startBtn').textContent='Set Sail';
   $('startBtn').disabled=false;
   G.ready=true;
-  window.__bb={STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
+  window.__bb={STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,WHEEL,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
   requestAnimationFrame(frame);
 }
 setTimeout(boot,40);
