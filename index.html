@@ -5098,6 +5098,164 @@ function crewCall(f){
   }catch(e){}
 })();
 
+/* ---- cloud saves (Supabase: email sign-in + one save row per slot) ---- */
+(function(){
+  const URL0='https://lhdkuubbopvgjeyqzlei.supabase.co',KEY='sb_publishable_m8oPOkzAXMem-F2MzR2Pbg_F6PcsSMh';
+  const SKEY='blackwaterbay.cloud.session',SLOT=SAVE_KEY.indexOf('tester')>=0?'tester':'main';
+  let sess=null,status='',busy=false,upT=0,lastUp=0,cloudMeta=null;
+  try{sess=JSON.parse(localStorage.getItem(SKEY)||'null');}catch(e){}
+  const keep=()=>{try{if(sess)localStorage.setItem(SKEY,JSON.stringify(sess));else localStorage.removeItem(SKEY);}catch(e){}};
+  const hdr=tok=>({'apikey':KEY,'Authorization':'Bearer '+(tok||KEY),'Content-Type':'application/json'});
+  function setSess(j){
+    if(!j||!j.access_token)return false;
+    sess={access:j.access_token,refresh:j.refresh_token,exp:Date.now()+((j.expires_in|0)||3600)*1000-60000,uid:(j.user&&j.user.id)||(sess&&sess.uid)||null,email:(j.user&&j.user.email)||(sess&&sess.email)||''};
+    if(!sess.uid){try{const p=JSON.parse(atob(j.access_token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));sess.uid=p.sub;sess.email=sess.email||p.email||'';}catch(e){}}
+    keep();return !!sess.uid;
+  }
+  async function token(){
+    if(!sess)return null;
+    if(Date.now()<sess.exp)return sess.access;
+    try{
+      const r=await fetch(URL0+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:hdr(),body:JSON.stringify({refresh_token:sess.refresh})});
+      if(!r.ok){if(r.status===400||r.status===401||r.status===403){sess=null;keep();}return null;}
+      setSess(await r.json());return sess&&sess.access;
+    }catch(e){return null;}
+  }
+  // magic-link return: tokens arrive in the URL hash
+  try{
+    const h=location.hash;
+    if(h&&h.indexOf('access_token=')>=0){
+      const q=new URLSearchParams(h.slice(1));
+      setSess({access_token:q.get('access_token'),refresh_token:q.get('refresh_token'),expires_in:+q.get('expires_in')||3600});
+      history.replaceState(null,'',location.pathname+location.search);status='Signed in.';
+    }else if(h&&h.indexOf('error_description=')>=0){
+      status=new URLSearchParams(h.slice(1)).get('error_description')||'Sign-in link failed.';history.replaceState(null,'',location.pathname+location.search);
+    }
+  }catch(e){}
+  async function api(path,opt){
+    const tk=await token();if(!tk)throw new Error('signed out');
+    const r=await fetch(URL0+'/rest/v1/'+path,Object.assign({headers:Object.assign(hdr(tk),(opt&&opt.prefer)?{'Prefer':opt.prefer}:{})},opt&&{method:opt.method,body:opt.body}));
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.status===204?null:r.json();
+  }
+  async function getCloud(){
+    const rows=await api('saves?select=data,updated_at&user_id=eq.'+sess.uid+'&slot=eq.'+SLOT);
+    return rows&&rows[0]||null;
+  }
+  async function putCloud(data){
+    await api('saves?on_conflict=user_id,slot',{method:'POST',prefer:'resolution=merge-duplicates,return=minimal',body:JSON.stringify({user_id:sess.uid,slot:SLOT,data:data,updated_at:new Date().toISOString()})});
+  }
+  const fmt=d=>{const s=d&&d.data?d.data:d;return s?(s.gold+' gold, '+(s.done|0)+' jobs done'+(s.t?', '+new Date(s.t).toLocaleString():'')):'none';};
+  function refreshTitle(){
+    const sv=readSave();G.hasSave=!!sv;
+    if(sv){$('contBtn').classList.remove('hidden');$('delBtn').classList.remove('hidden');$('saveInfo').textContent='Saved game: '+fmt(sv);$('startBtn').textContent='New Game';}
+  }
+  async function upload(manual){
+    if(!sess)return false;
+    const sv=readSave();if(!sv)return false;
+    try{await putCloud(sv);lastUp=Date.now();cloudMeta=sv;status='Uploaded '+new Date().toLocaleTimeString()+'.';if(manual)saveInd('Saved to cloud');draw();return true;}
+    catch(e){status='Cloud upload failed ('+e.message+'). Your local save is fine.';draw();return false;}
+  }
+  async function download(ask){
+    if(!sess)return;
+    try{
+      const row=await getCloud();
+      if(!row){status='No cloud save yet for this slot.';draw();return;}
+      const loc=readSave();
+      if(ask&&loc&&(loc.t|0)>=(row.data.t|0)){status='This device already has the newest save.';draw();return;}
+      if(loc&&!confirm('Replace this device\'s save ('+fmt(loc)+') with the cloud save ('+fmt(row)+')?'))return;
+      localStorage.setItem(SAVE_KEY,JSON.stringify(row.data));cloudMeta=row.data;
+      status='Cloud save downloaded.'+(G.state==='play'?' Return to the main menu and press Continue to load it.':'');refreshTitle();draw();
+    }catch(e){status='Download failed ('+e.message+').';draw();}
+  }
+  async function onSignedIn(){
+    try{
+      const row=await getCloud(),loc=readSave();
+      if(row&&(!loc||(row.data.t|0)>(loc.t|0))){
+        if(!loc){localStorage.setItem(SAVE_KEY,JSON.stringify(row.data));status='Cloud save loaded.';refreshTitle();}
+        else{await download(false);}
+      }else if(loc&&(!row||(loc.t|0)>(row.data.t|0))){await upload(false);}
+      else status=(row||loc)?'Cloud and this device match.':'No save yet. Play and it uploads automatically.';
+    }catch(e){status='Sync failed ('+e.message+').';}
+    draw();
+  }
+  // hook autosave / manual save
+  const _ws=writeSave;
+  writeSave=function(manual){
+    const ok=_ws(manual);
+    if(ok&&sess&&!G.deck){
+      const wait=manual?0:Math.max(0,45000-(Date.now()-lastUp));
+      clearTimeout(upT);upT=setTimeout(()=>upload(!!manual),wait);
+    }
+    return ok;
+  };
+  // UI
+  const ov=document.createElement('div');ov.id='cloudOv';ov.className='overlay hidden';ov.style.zIndex=60;
+  const card=document.createElement('div');card.className='parch';card.style.textAlign='center';ov.appendChild(card);
+  (document.getElementById('pause').parentNode).appendChild(ov);
+  const mk=(txt,fn,ghost)=>{const b=document.createElement('button');b.className='btn'+(ghost?' ghost':'');b.style.cssText='display:block;width:100%;margin-top:10px';b.textContent=txt;b.addEventListener('click',()=>{b.blur();fn();});return b;};
+  const inp=(ph,type)=>{const i=document.createElement('input');i.type=type||'text';i.placeholder=ph;i.autocomplete=type==='email'?'email':'one-time-code';i.style.cssText='display:block;width:100%;margin-top:10px;padding:11px;font:inherit;font-size:17px;border:2px solid #6b4a2b;border-radius:6px;background:#fff8e1;color:#2b1a0c;box-sizing:border-box;user-select:text;-webkit-user-select:text';
+    for(const ev of ['keydown','keyup','keypress'])i.addEventListener(ev,e=>{e.stopPropagation();});return i;};
+  let emailV='',codeV='',sent=false;
+  function draw(){
+    card.innerHTML='';
+    const h=document.createElement('h2');h.textContent='Cloud save';h.style.fontSize='32px';card.appendChild(h);
+    const p=(t,st)=>{const e=document.createElement('p');e.textContent=t;if(st)e.style.cssText=st;card.appendChild(e);return e;};
+    if(sess){
+      p('Signed in as '+(sess.email||'your account')+'. Your save uploads automatically after each autosave.');
+      const loc=readSave();p('This device: '+fmt(loc),'font-size:14px;margin:0 0 4px');
+      if(status)p(status,'font-size:14px;margin:6px 0 0;font-weight:700');
+      card.appendChild(mk('Upload this save now',async()=>{status='Uploading...';draw();await upload(true);},false));
+      card.appendChild(mk('Download the cloud save',()=>download(false),true));
+      card.appendChild(mk('Sign out',()=>{sess=null;keep();status='Signed out.';draw();},true));
+    }else{
+      p('Sign in with your email to keep one save across your Chromebook, phone and other devices. No password needed.');
+      const em=inp('you@example.com','email');em.value=emailV;em.addEventListener('input',()=>{emailV=em.value;});card.appendChild(em);
+      card.appendChild(mk(sent?'Send a new sign-in email':'Email me a sign-in link',async()=>{
+        emailV=em.value.trim();if(!/^\S+@\S+\.\S+$/.test(emailV)){status='Enter a valid email address.';draw();return;}
+        status='Sending...';draw();
+        try{
+          const r=await fetch(URL0+'/auth/v1/otp?redirect_to='+encodeURIComponent(location.origin+location.pathname),{method:'POST',headers:hdr(),body:JSON.stringify({email:emailV,create_user:true})});
+          if(r.ok){sent=true;status='Email sent. Click the link in it, or type the code from it below.';}
+          else{const j=await r.json().catch(()=>({}));status=(r.status===429?'Too many emails just now, wait a few minutes. ':'')+(j.msg||j.error_description||j.message||('Could not send ('+r.status+')'));}
+        }catch(e){status='Could not reach the sign-in service. Check your connection.';}
+        draw();
+      },false));
+      if(sent){
+        const cd=inp('code from the email','text');cd.inputMode='numeric';cd.value=codeV;cd.addEventListener('input',()=>{codeV=cd.value;});card.appendChild(cd);
+        card.appendChild(mk('Sign in with code',async()=>{
+          const code=cd.value.replace(/\s+/g,'');if(code.length<6){status='Enter the code from the email.';draw();return;}
+          status='Checking...';draw();
+          try{
+            const r=await fetch(URL0+'/auth/v1/verify',{method:'POST',headers:hdr(),body:JSON.stringify({type:'email',email:emailV,token:code})});
+            const j=await r.json().catch(()=>({}));
+            if(r.ok&&setSess(j)){status='Signed in.';sent=false;codeV='';draw();onSignedIn();return;}
+            status=j.msg||j.error_description||'That code did not work. Request a new email.';
+          }catch(e){status='Could not reach the sign-in service.';}
+          draw();
+        },false));
+      }
+      if(status)p(status,'font-size:14px;margin:8px 0 0;font-weight:700');
+    }
+    card.appendChild(mk('Close',()=>{ov.classList.add('hidden');},true));
+  }
+  const open=()=>{status=status||'';draw();ov.classList.remove('hidden');};
+  window.__cloudOpen=open;
+  try{
+    const pm=document.querySelector('#pause .parch');
+    const after=document.getElementById('soundBtn')||document.getElementById('crewBtn')||document.getElementById('touchBtn');
+    const b=document.createElement('button');b.className='btn ghost';b.id='cloudBtn';b.style.marginTop='12px';b.textContent='Cloud save';b.addEventListener('click',()=>{b.blur();open();});
+    if(after&&after.parentNode)after.parentNode.insertBefore(b,after.nextSibling);else pm.appendChild(b);
+    const sb=document.getElementById('startBtn');
+    const tb=document.createElement('button');tb.className='btn ghost';tb.id='cloudBtnT';tb.style.marginTop='10px';tb.textContent='Cloud save';tb.addEventListener('click',()=>{tb.blur();open();});
+    if(sb&&sb.parentNode)sb.parentNode.insertBefore(tb,sb.nextSibling);
+  }catch(e){}
+  window.__cloud={upload,download,getCloud,putCloud,state:()=>({sess,status}),setSess};
+  if(sess){setTimeout(()=>{if(sess)onSignedIn();},1200);}
+  else if(status){setTimeout(open,1300);}
+  if(sess&&status==='Signed in.')setTimeout(open,1300);
+})();
+
 function frame(ts){
   const dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;
   G.t+=dt;
