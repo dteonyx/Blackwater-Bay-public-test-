@@ -3084,7 +3084,7 @@ function debugTick(dt){
 $('resume').addEventListener('click',()=>{setPaused(false);$('resume').blur();});
 
 /* ================= save / load ================= */
-const BB_V={main:35,tester:21},BB_DATE='Oct 11, 2026';
+const BB_V={main:36,tester:36},BB_DATE='Oct 11, 2026';
 const SAVE_KEY='blackwaterbay.save.v1';
 let saveIndT=0;
 function saveInd(msg){const el=$('saveInd');el.textContent=msg;el.classList.add('show');clearTimeout(saveIndT);saveIndT=setTimeout(()=>el.classList.remove('show'),1700);}
