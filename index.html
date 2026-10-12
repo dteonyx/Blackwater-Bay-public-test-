@@ -3084,7 +3084,7 @@ function debugTick(dt){
 $('resume').addEventListener('click',()=>{setPaused(false);$('resume').blur();});
 
 /* ================= save / load ================= */
-const BB_V={main:36,tester:36},BB_DATE='Oct 11, 2026';
+const BB_V={main:38,tester:38},BB_DATE='Oct 11, 2026';
 const SAVE_KEY='blackwaterbay.save.v1';
 let saveIndT=0;
 function saveInd(msg){const el=$('saveInd');el.textContent=msg;el.classList.add('show');clearTimeout(saveIndT);saveIndT=setTimeout(()=>el.classList.remove('show'),1700);}
@@ -5356,7 +5356,7 @@ function crewCall(f){
   const mk=(txt,fn,ghost)=>{const b=document.createElement('button');b.className='btn'+(ghost?' ghost':'');b.style.cssText='display:block;width:100%;margin-top:10px';b.textContent=txt;b.addEventListener('click',()=>{b.blur();fn();});return b;};
   const inp=(ph,type)=>{const i=document.createElement('input');i.type=type||'text';i.placeholder=ph;i.autocomplete=type==='email'?'email':'one-time-code';i.style.cssText='display:block;width:100%;margin-top:10px;padding:11px;font:inherit;font-size:17px;border:2px solid #6b4a2b;border-radius:6px;background:#fff8e1;color:#2b1a0c;box-sizing:border-box;user-select:text;-webkit-user-select:text';
     for(const ev of ['keydown','keyup','keypress'])i.addEventListener(ev,e=>{e.stopPropagation();});return i;};
-  let emailV='',codeV='',sent=false;
+  let emailV='',passV='',sent=false;
   draw=function(){
     card.innerHTML='';
     const h=document.createElement('h2');h.textContent='Cloud save';h.style.fontSize='32px';card.appendChild(h);
@@ -5369,32 +5369,38 @@ function crewCall(f){
       card.appendChild(mk('Download the cloud save',()=>download(false),true));
       card.appendChild(mk('Sign out',()=>{sess=null;keep();status='Signed out.';draw();},true));
     }else{
-      p('Sign in with your email to keep one save across your Chromebook, phone and other devices. No password needed.');
+      p('Sign in to keep one save across your Chromebook, phone and other devices.');
       const em=inp('you@example.com','email');em.value=emailV;em.addEventListener('input',()=>{emailV=em.value;});card.appendChild(em);
+      const pw=inp('password (6+ characters)','password');pw.autocomplete='current-password';pw.value=passV;pw.addEventListener('input',()=>{passV=pw.value;});card.appendChild(pw);
+      const auth=async(mode)=>{
+        emailV=em.value.trim();passV=pw.value;
+        if(!/^\S+@\S+\.\S+$/.test(emailV)){status='Enter a valid email address.';draw();return;}
+        if(passV.length<6){status='Password must be at least 6 characters.';draw();return;}
+        status=mode==='up'?'Creating account...':'Signing in...';draw();
+        try{
+          const r=await fetch(URL0+(mode==='up'?'/auth/v1/signup':'/auth/v1/token?grant_type=password'),{method:'POST',headers:hdr(),body:JSON.stringify({email:emailV,password:passV})});
+          const j=await r.json().catch(()=>({}));
+          if(r.ok&&setSess(j)){status='Signed in.';passV='';draw();onSignedIn();return;}
+          if(r.ok&&mode==='up'){status='Account created. Supabase wants the email confirmed first: open the email we sent and tap its link, then come back and press Sign in.';}
+          else status=(j.msg||j.error_description||j.message||('Failed ('+r.status+')'));
+          if(/invalid login/i.test(status))status='Wrong email or password. New here? Press Create account.';
+          if(/already/i.test(status))status='That email already has an account. Press Sign in.';
+        }catch(e){status='Could not reach the sign-in service. Check your connection.';}
+        draw();
+      };
+      card.appendChild(mk('Sign in',()=>auth('in'),false));
+      card.appendChild(mk('Create account',()=>auth('up'),true));
+      p('Forgot it, or want no password? Use an emailed link instead. Open the link in the same browser or app where you play.','font-size:13px;margin:14px 0 0');
       card.appendChild(mk(sent?'Send a new sign-in email':'Email me a sign-in link',async()=>{
         emailV=em.value.trim();if(!/^\S+@\S+\.\S+$/.test(emailV)){status='Enter a valid email address.';draw();return;}
         status='Sending...';draw();
         try{
           const r=await fetch(URL0+'/auth/v1/otp?redirect_to='+encodeURIComponent(location.origin+location.pathname),{method:'POST',headers:hdr(),body:JSON.stringify({email:emailV,create_user:true})});
-          if(r.ok){sent=true;status='Email sent. Click the link in it, or type the code from it below.';}
+          if(r.ok){sent=true;status='Email sent. Open it and tap the sign-in link. It signs in whichever browser opens it, so on a phone your save will sync from there.';}
           else{const j=await r.json().catch(()=>({}));status=(r.status===429?'Too many emails just now, wait a few minutes. ':'')+(j.msg||j.error_description||j.message||('Could not send ('+r.status+')'));}
         }catch(e){status='Could not reach the sign-in service. Check your connection.';}
         draw();
-      },false));
-      if(sent){
-        const cd=inp('code from the email','text');cd.inputMode='numeric';cd.value=codeV;cd.addEventListener('input',()=>{codeV=cd.value;});card.appendChild(cd);
-        card.appendChild(mk('Sign in with code',async()=>{
-          const code=cd.value.replace(/\s+/g,'');if(code.length<6){status='Enter the code from the email.';draw();return;}
-          status='Checking...';draw();
-          try{
-            const r=await fetch(URL0+'/auth/v1/verify',{method:'POST',headers:hdr(),body:JSON.stringify({type:'email',email:emailV,token:code})});
-            const j=await r.json().catch(()=>({}));
-            if(r.ok&&setSess(j)){status='Signed in.';sent=false;codeV='';draw();onSignedIn();return;}
-            status=j.msg||j.error_description||'That code did not work. Request a new email.';
-          }catch(e){status='Could not reach the sign-in service.';}
-          draw();
-        },false));
-      }
+      },true));
       if(status)p(status,'font-size:14px;margin:8px 0 0;font-weight:700');
     }
     card.appendChild(mk('Close',()=>{ov.classList.add('hidden');},true));
