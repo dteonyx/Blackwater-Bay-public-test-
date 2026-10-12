@@ -3084,7 +3084,7 @@ function debugTick(dt){
 $('resume').addEventListener('click',()=>{setPaused(false);$('resume').blur();});
 
 /* ================= save / load ================= */
-const BB_V={main:38,tester:38},BB_DATE='Oct 11, 2026';
+const BB_V={main:39,tester:39},BB_DATE='Oct 11, 2026';
 const SAVE_KEY='blackwaterbay.save.v1';
 let saveIndT=0;
 function saveInd(msg){const el=$('saveInd');el.textContent=msg;el.classList.add('show');clearTimeout(saveIndT);saveIndT=setTimeout(()=>el.classList.remove('show'),1700);}
@@ -5285,7 +5285,7 @@ function crewCall(f){
     if(h&&h.indexOf('access_token=')>=0){
       const q=new URLSearchParams(h.slice(1));
       setSess({access_token:q.get('access_token'),refresh_token:q.get('refresh_token'),expires_in:+q.get('expires_in')||3600});
-      history.replaceState(null,'',location.pathname+location.search);status='Signed in.';
+      history.replaceState(null,'',location.pathname+location.search);status=q.get('type')==='recovery'?'Signed in. Choose a new password below.':'Signed in.';
     }else if(h&&h.indexOf('error_description=')>=0){
       status=new URLSearchParams(h.slice(1)).get('error_description')||'Sign-in link failed.';history.replaceState(null,'',location.pathname+location.search);
     }
@@ -5367,6 +5367,18 @@ function crewCall(f){
       if(status)p(status,'font-size:14px;margin:6px 0 0;font-weight:700');
       card.appendChild(mk('Upload this save now',async()=>{status='Uploading...';draw();await upload(true);},false));
       card.appendChild(mk('Download the cloud save',()=>download(false),true));
+      const np=inp('new password (6+ characters)','password');np.autocomplete='new-password';card.appendChild(np);
+      card.appendChild(mk('Set or change password',async()=>{
+        const v=np.value;if(v.length<6){status='Password must be at least 6 characters.';draw();return;}
+        const tk=await token();if(!tk){status='Please sign in again.';draw();return;}
+        status='Saving...';draw();
+        try{
+          const r=await fetch(URL0+'/auth/v1/user',{method:'PUT',headers:hdr(tk),body:JSON.stringify({password:v})});
+          const j=await r.json().catch(()=>({}));
+          status=r.ok?'Password saved. You can now sign in with your email and password anywhere.':(j.msg||j.error_description||j.message||('Could not save ('+r.status+')'));
+        }catch(e){status='Could not reach the sign-in service.';}
+        draw();
+      },true));
       card.appendChild(mk('Sign out',()=>{sess=null;keep();status='Signed out.';draw();},true));
     }else{
       p('Sign in to keep one save across your Chromebook, phone and other devices.');
@@ -5390,7 +5402,17 @@ function crewCall(f){
       };
       card.appendChild(mk('Sign in',()=>auth('in'),false));
       card.appendChild(mk('Create account',()=>auth('up'),true));
-      p('Forgot it, or want no password? Use an emailed link instead. Open the link in the same browser or app where you play.','font-size:13px;margin:14px 0 0');
+      p('Forgot your password, or made your account with an emailed link and never set one? Email yourself a link. It signs you in, then you can set a password. Open the link in the browser or app where you play.','font-size:13px;margin:14px 0 0');
+      card.appendChild(mk('Forgot password',async()=>{
+        emailV=em.value.trim();if(!/^\S+@\S+\.\S+$/.test(emailV)){status='Enter your email address first.';draw();return;}
+        status='Sending...';draw();
+        try{
+          const r=await fetch(URL0+'/auth/v1/recover?redirect_to='+encodeURIComponent(location.origin+location.pathname),{method:'POST',headers:hdr(),body:JSON.stringify({email:emailV})});
+          if(r.ok){sent=true;status='Reset email sent. Tap the link in it, then set a new password here.';}
+          else{const j=await r.json().catch(()=>({}));status=(r.status===429?'Too many emails just now, wait a few minutes. ':'')+(j.msg||j.error_description||j.message||('Could not send ('+r.status+')'));}
+        }catch(e){status='Could not reach the sign-in service. Check your connection.';}
+        draw();
+      },true));
       card.appendChild(mk(sent?'Send a new sign-in email':'Email me a sign-in link',async()=>{
         emailV=em.value.trim();if(!/^\S+@\S+\.\S+$/.test(emailV)){status='Enter a valid email address.';draw();return;}
         status='Sending...';draw();
@@ -5420,7 +5442,7 @@ function crewCall(f){
   window.__cloud={upload,download,getCloud,putCloud,state:()=>({sess,status}),setSess};
   if(sess){setTimeout(()=>{if(sess)onSignedIn();},1200);}
   else if(status){setTimeout(open,1300);}
-  if(sess&&status==='Signed in.')setTimeout(open,1300);
+  if(sess&&/^Signed in\./.test(status))setTimeout(open,1300);
 })();
 
 /* ---- weapon wheel: weapons + a Commands sub-wheel (crew, steed, tonic) ---- */
