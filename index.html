@@ -301,15 +301,23 @@ const WEAP={
   duel:{n:'Dueling Pistol',cat:'gun',ammo:'shot',dmg:64,rel:1.5,speed:1050,life:0.8,spread:0.004,pellets:1,noise:320,sfx:'pistol',col:'rgba(255,255,255,.95)',shake:2.2},
   blunder:{n:'Blunderbuss',cat:'gun',ammo:'grape',dmg:15,rel:1.5,speed:640,life:0.34,spread:0.24,pellets:7,noise:460,sfx:'musket',col:'rgba(255,200,120,.9)',shake:4},
   musket:{n:'Musket',cat:'gun',ammo:'shot',dmg:85,rel:2.1,speed:1300,life:1.0,spread:0.004,pellets:1,noise:520,sfx:'musket',col:'rgba(255,255,230,.95)',shake:3},
-  bomb:{n:'Grenado',cat:'gun',ammo:'bombs',rel:1.1,noise:0},
-  knives:{n:'Throwing Knives',cat:'gun',ammo:'knives',dmg:24,rel:0.3,speed:720,life:0.5,spread:0.03,pellets:1,silent:true,sfx:'slash',col:'rgba(220,230,255,.95)'}
+  fists:{n:'Fists',cat:'melee',dmg:9,cd:0.4,swing:0.22,reach:34,arc:0.9,hidden:true},
+  nogun:{n:'No firearm',cat:'gun',ammo:'none',hidden:true},
+  bomb:{n:'Grenado',cat:'thrown',thr:'lob',kind:'bomb',ammo:'bombs',rel:1.1,noise:0},
+  rum:{n:'Rum Bottle',cat:'thrown',thr:'lob',kind:'rum',ammo:'rums',rel:0.7,noise:0,hidden:true},
+  knifeM:{n:'Knife',cat:'melee',dmg:16,cd:0.26,swing:0.18,reach:38,arc:0.7,hidden:true},
+  hatchetM:{n:'Hatchet',cat:'melee',dmg:34,cd:0.5,swing:0.26,reach:44,arc:1.0,knock:200,hidden:true},
+  molo:{n:'Molotov Cocktail',cat:'thrown',thr:'lob',kind:'molo',ammo:'molos',rel:1.2,noise:0},
+  knives:{n:'Throwing Knives',cat:'thrown',thr:'blade',ammo:'knives',dmg:24,rel:0.3,speed:720,life:0.5,spread:0.03,pellets:1,silent:true,sfx:'slash',col:'rgba(220,230,255,.95)'},
+  hatchet:{n:'Throwing Hatchet',cat:'thrown',thr:'blade',ammo:'hatchets',dmg:46,rel:0.55,speed:620,life:0.46,spread:0.02,pellets:1,silent:true,sfx:'slash',col:'rgba(235,225,200,.95)'}
 };
-const WORDER=['cutlass','rapier','axe','pistol','duel','blunder','musket','bomb','knives'];
-const AMMO_NAME={shot:'powder and shot',grape:'grapeshot',bombs:'grenados',knives:'throwing knives'};
-const AMMO_MAX={shot:60,grape:30,bombs:15,knives:30};
+const WORDER=['cutlass','rapier','axe','pistol','duel','blunder','musket','bomb','molo','knives','hatchet'];
+const THROWN=['bomb','molo','knives','hatchet'];
+const AMMO_NAME={shot:'powder and shot',grape:'grapeshot',bombs:'grenados',knives:'throwing knives',rums:'rum bottles',molos:'molotovs',hatchets:'throwing hatchets'};
+const AMMO_MAX={shot:60,grape:30,bombs:15,knives:20,rums:12,molos:10,hatchets:15};
 
 /* ================= global state ================= */
-const G={state:'title',t:0,gold:60,goldPending:0,goldT:0,heat:0,seen:false,seenNext:false,unseen:0,tod:0.33,done:0,ammo:{shot:12,grape:0,bombs:0,knives:0},owned:{cutlass:1,pistol:1},melee:'cutlass',gun:'pistol',chestsTaken:[],steed:null,stable:[],items:{tonic:1,feed:0},taming:null,saveT:0,ready:false,hasSave:false,kills:0,
+const G={state:'title',look:{coat:'#2b2630',coat2:'#b02a2a',skin:'#d9a878',hat:'bandana',hatc:'#c0372c'},t:0,gold:60,goldPending:0,goldT:0,heat:0,seen:false,seenNext:false,unseen:0,tod:0.33,done:0,ammo:{shot:12,grape:0,bombs:0,knives:0,rums:0,molos:0,hatchets:0},owned:{cutlass:1,pistol:1},melee:'cutlass',gun:'pistol',carry:['cutlass','pistol'],thrown:null,chestsTaken:[],steed:null,stable:[],items:{tonic:1,feed:0},taming:null,saveT:0,ready:false,hasSave:false,kills:0,
   shake:0,paused:false,shop:null,mute:false,upg:{hull:0,dmg:0,speed:0},zoomMul:1,spawnT:2,deathT:0,hurtFlash:0,bigmap:false,won:false,areaT:0,area:'',alertShown:false,lastSeen:null,coolRate:0,marque:0,board:null,heatHint:false,wrecks:[],shopPage:'main',deck:null,grap:null,dbg:false,tp:false,dbgHold:0,dbgLatch:false,padOn:false,touchOn:false};
 const player={x:0,y:0,a:0,vx:0,vy:0,hp:100,maxhp:100,ship:null,cool:0,reload:0,swing:0,swingMax:0.28,aimT:0,horse:null,ha:0,hvx:0,hvy:0,walk:0,dead:false,invuln:0,flash:0};
 const cam={x:0,y:0,z:1};
@@ -406,9 +414,9 @@ function makeTown(o){
       const b=addBuilding(bx+ox,by+oy,bw,bh,Object.assign({col,trim:shadeCol(col,-0.35),chim:rng()<0.5},sp||{}));
       town.blds.push(b);
       if(b.kind==='tavern')zones.push({kind:'tavern',name:o.names.tavern,x:(b.dx+0.5)*TS,y:(b.dy+0.7)*TS,r:72,law:o.law,home:o.id,prompt:'Enter the tavern'});
-      if(b.kind==='governor')zones.push({kind:'governor',name:o.names.gov,x:(b.dx+0.5)*TS,y:(b.dy+0.7)*TS,r:76,law:false,home:o.id,prompt:'Speak with the Governor'});
-      if(b.kind==='stable')zones.push({kind:'stable',name:o.names.stable,x:(b.dx+0.5)*TS,y:(b.dy+0.7)*TS,r:70,law:o.law,home:o.id,prompt:'Visit the stable'});
-      if(b.kind==='armory')zones.push({kind:'armory',name:o.names.arm,x:(b.dx+0.5)*TS,y:(b.dy+0.7)*TS,r:70,law:o.law,home:o.id,prompt:'Browse the armory'});
+      if(b.kind==='governor')zones.push({kind:'governor',name:o.names.gov,x:(b.dx+0.5)*TS,y:(b.dy+0.7)*TS,r:76,law:false,home:o.id,prompt:'Enter the Governor\'s house'});
+      if(b.kind==='stable')zones.push({kind:'stable',name:o.names.stable,x:(b.dx+0.5)*TS,y:(b.dy+0.7)*TS,r:70,law:o.law,home:o.id,prompt:'Enter the stable'});
+      if(b.kind==='armory')zones.push({kind:'armory',name:o.names.arm,x:(b.dx+0.5)*TS,y:(b.dy+0.7)*TS,r:70,law:o.law,home:o.id,prompt:'Enter the armory'});
     }
   }
   for(let kx=0;x0+6+7*kx<x0+w-1;kx++)for(let ky=0;y0+5+6*ky<y0+h-1;ky++)lamps.push({x:(x0+6+7*kx+1)*TS,y:(y0+5+6*ky+1)*TS});
@@ -431,8 +439,8 @@ function makeShipyard(town,pier){
   addBuilding(sx,sy,5,3,{kind:'shipyard',label:'SHIPYARD',col:'#8d7757',trim:'#4d3a22'});
   const dy=sy+3;
   for(let x=pier.px+2;x<=sx+2;x++)setT(x,dy,tiles[ix(x,dy)]<=1?TL.DOCK:TL.STREET);
-  zones.push({kind:'registry',name:'Harbour Registry',x:(sx+2.5)*TS,y:(dy+0.5)*TS,r:64,law:town.law,home:town.id,prompt:'Harbour Registry (ship papers)'});
-  zones.push({kind:'shipyard',name:town.names.yard,x:(pier.px+1)*TS,y:pier.wy*TS,r:190,law:town.law,home:town.id,prompt:'Visit the shipyard'});
+  zones.push({kind:'registry',name:'Harbour Registry',x:(sx+2.5)*TS,y:(dy+0.5)*TS,r:64,law:town.law,home:town.id,prompt:'Enter the Harbour Registry (ship papers)'});
+  zones.push({kind:'shipyard',name:town.names.yard,x:(pier.px+1)*TS,y:pier.wy*TS,r:190,law:town.law,home:town.id,prompt:'Enter the shipyard office'});
 }
 
 let TPIER,PPIER,FPIER,CPIER,BPIER,FORT,SK,ANCH=[],TDOCK,START,CASTLE,CRPIER,SENT,GRAVE;
@@ -657,7 +665,7 @@ function findShipSpot(x,y,a,type){
   for(let r=16;r<420;r+=16)for(let k=0;k<16;k++){const aa=k/16*TAU;const nx=x+Math.cos(aa)*r,ny=y+Math.sin(aa)*r;if(shipFree(nx,ny,a,st))return {x:nx,y:ny};}
   return {x,y};
 }
-function moor(type,fac,tx,ty,a){const p=findShipSpot(tx*TS,ty*TS,a,type);return mkShip(type,fac,p.x,p.y,a,null);}
+function moor(type,fac,tx,ty,a){const p=findShipSpot(tx*TS,ty*TS,a,type);const m=mkShip(type,fac,p.x,p.y,a,null);m.keep=true;return m;}
 function randDeepNear(cx,cy,rad,tries){
   for(let k=0;k<(tries||40);k++){const a=rand()*TAU,r=Math.sqrt(rand())*rad;const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;if(tileAt(x,y)===0&&shipFree(x,y,0,ST.galleon))return {x,y};}
   return null;
@@ -703,10 +711,10 @@ function spawnInitial(){
   for(let i=0;i<5;i++)spawnSea('raider');
   for(const T of TOWNS){
     if(T.law){
-      for(let i=0;i<14;i++){const q=randTownPos(T);mkFolk('civ',q.x,q.y,{law:true});}
+      for(let i=0;i<14;i++){const q=randTownPos(T);mkFolk('civ',q.x,q.y,{town:T.id,law:true});}
       for(let i=0;i<8;i++){const q=randTownPos(T);mkFolk('soldier',q.x,q.y,{st:'patrol'});}
     }else{
-      for(let i=0;i<12;i++){const q=randTownPos(T);mkFolk('civ',q.x,q.y,{look:'pirate',coat:['#2c2a31','#6a2a2a','#2a4a6a','#3a3a3a'][ri(0,3)],hat:['bandana','bandana','tricorn','none'][ri(0,3)],weapon:rand()<0.5?'sword':null});}
+      for(let i=0;i<12;i++){const q=randTownPos(T);mkFolk('civ',q.x,q.y,{town:T.id,look:'pirate',coat:['#2c2a31','#6a2a2a','#2a4a6a','#3a3a3a'][ri(0,3)],hat:['bandana','bandana','tricorn','none'][ri(0,3)],weapon:rand()<0.5?'sword':null});}
     }
   }
   for(let i=0;i<9;i++){const q=randTownPos({x0:FORT.x0+1,y0:FORT.y0+5,w:FORT.w-2,h:FORT.h-6},TL.STONE);mkFolk('soldier',q.x,q.y,{st:'patrol'});}
@@ -741,13 +749,16 @@ function hurtPerson(p,d,ang,byPlayer){
   sfx('hit',p.x,p.y);sparks(p.x,p.y,4,'#fff3c0');
   if(byPlayer){
     if(p.kind==='soldier'){p.hurt=10;addHeat(7);}
-    else if(p.kind==='civ'){p.flee=5;p.fa=rr(-0.5,0.5);alarm(p.x,p.y,160);if(p.law)addHeat(8);}
+    else if(p.kind==='civ'){
+      if(!(G.fight&&G.fight.id===p.town)){p.flee=5;p.fa=rr(-0.5,0.5);alarm(p.x,p.y,160);}
+      if(p.law)addHeat(8);
+    }
   }
   if(p.hp<=0){
     p.dead=true;G.kills++;
     corpses.push({x:p.x,y:p.y,a:p.a,coat:p.coat,coat2:p.coat2,skin:p.skin,hat:p.hat==='skull'?'skull':'none',t:8});
     dropLoot(p.x,p.y,p.kind);
-    if(byPlayer){if(p.kind==='soldier')addHeat(14);else if(p.kind==='civ'&&p.law)addHeat(25);}
+    if(byPlayer){if(p.kind==='soldier')addHeat(14);else if(p.kind==='civ'&&p.law)addHeat(25);if(p.kind==='civ'&&p.town&&!p.raider)townAnger(p.town);}
     if(mission&&mission.def.onKill)mission.def.onKill(mission,p);
   }
 }
@@ -815,6 +826,7 @@ function fireBroadside(s,side){
 }
 function die(){
   const P=player;if(P.dead)return;
+  if(G.drunk){G.drunk.t=0;G.drunk.buzz=0;if(typeof hideDrunk==='function')hideDrunk();}
   if(G.deck&&G.deck.scene==='prison'){prisonCaught();return;}
   if(G.god){P.hp=P.maxhp;return;}
   if(G.deck){G.deck.tgt.held=3;G.deck=null;parts.length=0;}
@@ -899,8 +911,8 @@ function takeShip(s,how){
   G.taming=null;if(P.horse){P.horse.ridden=false;P.horse.x=P.x;P.horse.y=P.y;P.horse.wt=2;P.horse.tx=P.horse.x;P.horse.ty=P.horse.y;P.horse=null;}
   if(P.ship&&P.ship!==s){const o=P.ship;o.crew=null;o.thr=0;o.sail=0;o.turn=0;}
   const wasNavy=s.fac==='navy';
-  if(!s.own&&!s.hinted){s.hinted=true;later(1.6,()=>toast('No papers on this ship. File them at a Harbour Registry (beside a shipyard) to fit level 2 upgrades.'));}
-  P.ship=s;s.crew='player';s.thr=0;s.sail=0;s.zeroT=0;s.turn=0;s.fleeT=0;s.held=0;s.fac='pirate';
+  if(!s.own&&!s.hinted){s.hinted=true;later(1.6,()=>toast('No papers on this ship. Buy ship papers at a Harbour Registry, then sign for her at the captain\'s desk below deck.'));}
+  P.ship=s;G.lastShip=s;s.keep=false;s.idleT=0;s.crew='player';s.thr=0;s.sail=0;s.zeroT=0;s.turn=0;s.fleeT=0;s.held=0;s.fac='pirate';
   const nm=ST[s.type].hp+40*G.upg.hull;if(nm!==s.maxhp){s.hp=Math.max(1,s.hp*nm/s.maxhp);s.maxhp=nm;}
   if(wasNavy){addHeat(how==='hijack'?30:22);if(how!=='hijack')toast('Ye stole a Navy ship!','bad');}
   else if(G.heat>0&&!G.seen){G.heat=Math.max(0,G.heat-25);toast('New ship, new colours. The Navy lost yer trail.','good');if(G.heat<=0)clearHeat();}
@@ -975,34 +987,35 @@ function pickInteract(){
 const shopEl=$('shop');
 function openShop(z){
   if(z.law&&G.heat>0){toast("The guards won't serve a wanted pirate!",'bad');sfx('no');return;}
-  G.shopPage='main';G.shop=z;renderShop();shopEl.classList.remove('hidden');sfx('ui');
+  G.shopPage='main';G.shopCat=null;G.shop=z;renderShop();shopEl.classList.remove('hidden');sfx('ui');
 }
-function closeShop(){G.shop=null;G.shopPage='main';shopEl.classList.add('hidden');}
+function closeShop(){G.shop=null;G.shopPage='main';G.shopCat=null;shopEl.classList.add('hidden');}
 function shopItems(z){
   const P=player,items=[];
   if(z.kind==='tavern'){
-    items.push({t:'Tankard of rum',d:'Restores your health to full.',c:z.law?40:25,ok:()=>P.hp<P.maxhp,run(){P.hp=P.maxhp;toast('Ahh. Health restored.','good');}});
-    items.push({t:'Powder and shot (x12)',d:'Ammunition for pistols and muskets. Carry up to 60.',c:20,ok:()=>G.ammo.shot<AMMO_MAX.shot,run(){G.ammo.shot=Math.min(AMMO_MAX.shot,G.ammo.shot+12);}});
+    items.push({sec:'Food and drink',t:'Tankard of rum',d:'Restores your health to full.',c:z.law?40:25,ok:()=>P.hp<P.maxhp,run(){P.hp=P.maxhp;toast('Ahh. Health restored.','good');}});
+    items.push({t:'Bottle of rum ('+(G.items.rum|0)+'/6)',d:'Mild healing. Drink it from your inventory (I). Drink too many and ye will be drunk.',c:12,ok:()=>(G.items.rum|0)<6,run(){G.items.rum=(G.items.rum|0)+1;}});
+    items.push({sec:'Supplies',t:'Powder and shot (x12)',d:'Ammunition for pistols and muskets. Carry up to 60.',c:20,ok:()=>G.ammo.shot<AMMO_MAX.shot,run(){G.ammo.shot=Math.min(AMMO_MAX.shot,G.ammo.shot+12);}});
     if(!z.law){
-      items.push({t:'Bribe the Navy',d:'Makes your notoriety disappear.',c:120,ok:()=>G.heat>0,run(){clearHeat('The Navy has been persuaded.');}});
+      items.push({sec:'Services',t:'Bribe the Navy',d:'Makes your notoriety disappear.',c:120,ok:()=>G.heat>0,run(){clearHeat('The Navy has been persuaded.');}});
       items.push({t:mission?'Current job: '+mission.def.title:'Ask about work',d:mission?'Finish what ye started first.':'Captain Flint always has a job.',c:0,ok:()=>!mission,run(){closeShop();startMission(G.done);}});
     }
   }else if(z.kind==='shipyard'){
     if(G.shopPage==='fleet'){fleetItems(z,items);return items;}
     const s=myShip();
-    items.push({t:'Repair hull',d:s?'Patches '+Math.round(s.maxhp-s.hp)+' damage on the '+ST[s.type].name+'.':'Bring a ship of yours within reach.',c:s?Math.max(10,Math.ceil((s.maxhp-s.hp)*0.4)):0,ok:()=>!!s&&s.hp<s.maxhp-0.5,run(){s.hp=s.maxhp;toast('Hull repaired.','good');}});
+    items.push({sec:'Repairs and upgrades',t:'Repair hull',d:s?'Patches '+Math.round(s.maxhp-s.hp)+' damage on the '+ST[s.type].name+'.':'Bring a ship of yours within reach.',c:s?Math.max(10,Math.ceil((s.maxhp-s.hp)*0.4)):0,ok:()=>!!s&&s.hp<s.maxhp-0.5,run(){s.hp=s.maxhp;toast('Hull repaired.','good');}});
     const lv=G.upg;
     items.push({t:'Reinforced hull ('+lv.hull+'/3)',d:'+40 hull on every ship you sail.',c:150+120*lv.hull,ok:()=>lv.hull<3,run(){lv.hull++;const sh=myShip();if(sh){sh.maxhp+=40;sh.hp+=40;}}});
     items.push({t:'Heavy cannons ('+lv.dmg+'/3)',d:'+30% cannon damage.',c:180+140*lv.dmg,ok:()=>lv.dmg<3,run(){lv.dmg++;}});
     items.push({t:'Tarred sails ('+lv.speed+'/3)',d:'+12% top speed.',c:140+120*lv.speed,ok:()=>lv.speed<3,run(){lv.speed++;}});
     const owned=ships.filter(q=>q.fac==='pirate'&&!q.dead).length;
     const pier=PIERS[z.home],fc=fleetCount();
-    const buyShip=(type,name,desc,c)=>({t:'Buy '+name,d:desc+' Papers filed in your name ('+fc+'/3 fleet).',c,ok:()=>owned<5&&fc<3,run(){const sh=spawnDockShip(type,pier);registerShip(sh);toast('A new '+name.replace(/^an? /,'')+' is moored at the pier.','good');}});
+    const buyShip=(type,name,desc,c)=>({sec:'Ships for sale',t:'Buy '+name,d:desc+' Papers filed in your name ('+fc+'/3 fleet).',c,ok:()=>owned<5&&fc<3,run(){const sh=spawnDockShip(type,pier);registerShip(sh);toast('A new '+name.replace(/^an? /,'')+' is moored at the pier.','good');}});
     items.push(buyShip('cutter','a cutter','Tiny, one gun a side, the quickest hull afloat.',150));
     items.push(buyShip('sloop','a sloop','Fast and nimble, moored at the pier.',200));
     items.push(buyShip('schooner','a schooner','Swift two-master, two guns a side.',380));
     items.push(buyShip('brig','a brig','Sturdier, three guns a side.',520));
-    items.push({t:'Fleet, fittings and papers',d:'Level 2 fittings, sell a ship or raise a wreck. '+fc+'/3 ships registered.',c:0,lbl:'›',ok:()=>true,run(){G.shopPage='fleet';}});
+    items.push({sec:'Your fleet',t:'Fleet, fittings and papers',d:'Level 2 fittings, sell a ship or raise a wreck. '+fc+'/3 ships registered.',c:0,lbl:'›',ok:()=>true,run(){G.shopPage='fleet';}});
   }else if(z.kind==='fence'){
     const hot=ships.filter(q=>q.fac==='pirate'&&!q.dead&&!q.own&&dist(q.x,q.y,z.x,z.y)<900);
     items.push({t:'Stolen ships, no papers, no questions',d:'Pays double the shipyard rate for any ship that is not registered to you.',c:0,lbl:'\u2014',ok:()=>false,run(){}});
@@ -1012,11 +1025,9 @@ function shopItems(z){
     }
     if(!hot.length)items.push({t:'No stolen ships in sight',d:'Anchor an unregistered ship close to the island, step ashore, and come back.',c:0,lbl:'\u2014',ok:()=>false,run(){}});
   }else if(z.kind==='registry'){
-    const cand=ships.filter(q=>q.fac==='pirate'&&!q.dead&&!q.own&&dist(q.x,q.y,z.x,z.y)<720);
     const fc=fleetCount();
     items.push({t:'Fleet registered: '+fc+' / 3',d:fc>=3?'Your fleet is full. Sell a ship at the shipyard first.':'Papers in your name unlock level 2 fittings at the shipyard.',c:0,lbl:'\u2014',ok:()=>false,run(){}});
-    for(const q of cand.slice(0,5))items.push({t:'File papers: '+ST[q.type].name+(q.conq?' (prize)':'')+(P.ship===q?' (aboard)':''),d:'Registers her in your name. Hull '+Math.round(q.hp)+'/'+q.maxhp+'.',c:REG_FEE[q.type],ok:()=>fleetCount()<3&&!q.own&&!q.dead,run(){registerShip(q);}});
-    if(!cand.length)items.push({t:'No unregistered ships in port',d:'Sail a stolen or captured ship to this harbour first.',c:0,lbl:'\u2014',ok:()=>false,run(){}});
+    items.push({t:'Ship papers ('+(G.items.papers|0)+' held)',d:'One set claims one ship. Sail the prize home, go below deck, and sign at the captain\'s desk. Open your inventory with I.',c:150,ok:()=>(G.items.papers|0)<5,run(){G.items.papers=(G.items.papers|0)+1;toast('Ship papers added to your inventory.','good');}});
   }else if(z.kind==='governor'){
     const st3=stars(),chance=clamp(0.4+G.done*0.07+(P.hp/P.maxhp)*0.1,0.4,0.85);
     items.push({t:'Offer a generous "donation"',d:'Buys a royal pardon. All charges dropped.',c:200+Math.max(1,st3)*120,ok:()=>G.heat>0,run(){clearHeat('The Governor signs yer pardon with a very forced smile.');}});
@@ -1028,30 +1039,39 @@ function shopItems(z){
     items.push({t:'Letter of marque (90s)',d:'The Navy looks the other way for 90 seconds.',c:550,ok:()=>G.marque<=0,run(){G.marque=90;clearHeat('Letter of marque granted. Sail with impunity... for now.');}});
   }else if(z.kind==='armory'){
     const own=k=>!!G.owned[k];
-    const wi=(k,c,d,extra)=>({t:WEAP[k].n,d:own(k)?'Owned. Equip it from the weapon wheel (Tab).':d,c:own(k)?0:c,lbl:own(k)?'Owned':undefined,ok:()=>!own(k),run(){G.owned[k]=1;if(WEAP[k].cat==='melee')G.melee=k;else G.gun=k;if(extra)extra();toast(WEAP[k].n+' acquired and equipped.','good');}});
+    let curSec='';
+    const wi=(k,c,d,extra)=>({sec:curSec,t:WEAP[k].n,d:own(k)?'Owned. Equip it from the weapon wheel (Tab).':d,c:own(k)?0:c,lbl:own(k)?'Owned':undefined,ok:()=>!own(k),run(){acquireWeapon(k);if(extra)extra();}});
+    curSec='Melee weapons';
     items.push(wi('rapier',130,'Fast and long reach, but light damage.'));
     items.push(wi('axe',170,'Slow and brutal. Wide swing, heavy knockback.'));
+    curSec='Firearms';
     items.push(wi('duel',320,'One accurate, hard-hitting shot. Slow to reload.'));
     items.push(wi('blunder',280,'Shotgun: 7 pellets, devastating up close. Includes 8 grapeshot.',()=>{G.ammo.grape=Math.min(AMMO_MAX.grape,G.ammo.grape+8);}));
     items.push(wi('musket',450,'Long-range rifle. Huge damage, slow reload.'));
+    curSec='Thrown weapons';
     items.push(wi('bomb',90,'Thrown explosive with area damage. Includes 4 grenados.',()=>{G.ammo.bombs=Math.min(AMMO_MAX.bombs,G.ammo.bombs+4);}));
-    items.push(wi('knives',110,'Silent and fast. Includes 12 knives.',()=>{G.ammo.knives=Math.min(AMMO_MAX.knives,G.ammo.knives+12);}));
-    items.push({t:'Restock ammunition',d:'+12 shot, and refills grapeshot, grenados and knives for weapons you own.',c:70,ok:()=>true,run(){
+    items.push(wi('knives',110,'Silent and fast. Includes 12 knives. Thrown knives can be picked back up.',()=>{G.ammo.knives=Math.min(AMMO_MAX.knives,G.ammo.knives+12);}));
+    items.push(wi('hatchet',95,'Heavy thrown axe. Hits hard, can be picked back up. Includes 6.',()=>{G.ammo.hatchets=Math.min(AMMO_MAX.hatchets,G.ammo.hatchets+6);}));
+    items.push(wi('molo',60,'A rum bottle with a burning rag. Shatters and sets the ground ablaze. Includes 6.',()=>{G.ammo.molos=Math.min(AMMO_MAX.molos,G.ammo.molos+6);}));
+    curSec='Supplies';
+    items.push({sec:curSec,t:'Restock ammunition',d:'+12 shot, and refills grapeshot, grenados and knives for weapons you own.',c:70,ok:()=>true,run(){
       G.ammo.shot=Math.min(AMMO_MAX.shot,G.ammo.shot+12);
       if(own('blunder'))G.ammo.grape=Math.min(AMMO_MAX.grape,G.ammo.grape+8);
       if(own('bomb'))G.ammo.bombs=Math.min(AMMO_MAX.bombs,G.ammo.bombs+3);
       if(own('knives'))G.ammo.knives=Math.min(AMMO_MAX.knives,G.ammo.knives+10);
+      if(own('hatchet'))G.ammo.hatchets=Math.min(AMMO_MAX.hatchets,G.ammo.hatchets+4);
+      if(own('molo'))G.ammo.molos=Math.min(AMMO_MAX.molos,G.ammo.molos+3);
       toast('Ammunition restocked.','good');}});
   }
   if(z.kind==='stable'){
     const h=G.steed,near=!!h&&dist(h.x,h.y,P.x,P.y)<500,total=(h?1:0)+G.stable.length,nxt=G.stable[0];
-    items.push({t:'Feed & groom',d:!h?'You have no steed.':near?(h.down?'Nurse '+h.name+' back on its feet.':'Heal and rest '+h.name+'. Deepens your bond.'):'Bring '+h.name+' here first (press H).',c:h&&h.down?90:40,ok:()=>near,run(){const st=steedStats(h);h.down=false;h.hp=st.hp;h.stam=st.stam;h.winded=false;addBond(h,40);toast(h.name+' looks glorious.','good');}});
+    items.push({sec:'Care',t:'Feed & groom',d:!h?'You have no steed.':near?(h.down?'Nurse '+h.name+' back on its feet.':'Heal and rest '+h.name+'. Deepens your bond.'):'Bring '+h.name+' here first (press H).',c:h&&h.down?90:40,ok:()=>near,run(){const st=steedStats(h);h.down=false;h.hp=st.hp;h.stam=st.stam;h.winded=false;addBond(h,40);toast(h.name+' looks glorious.','good');}});
     items.push({t:'Horse tonic ('+G.items.tonic+'/5)',d:'Heals or revives your steed. Press V to use.',c:50,ok:()=>G.items.tonic<5,run(){G.items.tonic++;}});
     for(const key of ['arabian','destrier','phantom']){
       const B=BREEDS[key];
-      items.push({t:'Buy '+(/^[AEIOU]/.test(B.n)?'an ':'a ')+B.n,d:'Speed '+B.speed+', stamina '+B.stam+', health '+B.hp+'. '+(total>=4?'Your stable is full.':'Your current steed moves to the stable.'),c:B.price,ok:()=>total<4,run(){buySteed(key);}});
+      items.push({sec:'Horses for sale',t:'Buy '+(/^[AEIOU]/.test(B.n)?'an ':'a ')+B.n,d:'Speed '+B.speed+', stamina '+B.stam+', health '+B.hp+'. '+(total>=4?'Your stable is full.':'Your current steed moves to the stable.'),c:B.price,ok:()=>total<4,run(){buySteed(key);}});
     }
-    items.push({t:nxt?'Swap to '+nxt.name+' ('+BREEDS[nxt.breed].n+')':'Swap steed',d:nxt?'Bring '+nxt.name+' out. Your current steed goes to the stable.':'No other steeds. Buy or tame one.',c:0,ok:()=>!!nxt,run(){swapSteed();}});
+    items.push({sec:'Your stable',t:nxt?'Swap to '+nxt.name+' ('+BREEDS[nxt.breed].n+')':'Swap steed',d:nxt?'Bring '+nxt.name+' out. Your current steed goes to the stable.':'No other steeds. Buy or tame one.',c:0,ok:()=>!!nxt,run(){swapSteed();}});
     items.push({t:nxt?'Sell '+nxt.name:'Sell a stabled steed',d:nxt?'Sell your next stabled steed for gold.':'No stabled steeds.',c:0,lbl:nxt?'+'+Math.round(BREEDS[nxt.breed].price*0.5+nxt.bond*0.2)+'g':undefined,ok:()=>!!nxt,run(){sellStabled();}});
   }
   return items;
@@ -1061,12 +1081,27 @@ function renderShop(){
   $('shopTitle').textContent=z.name;
   $('shopSub').textContent=z.kind==='tavern'?(z.law?'A respectable establishment. Keep yer cutlass sheathed.':'Smoke, rum, and men who owe each other money.'):z.kind==='stable'?'Hay, leather, and the occasional kick.':z.kind==='armory'?'Steel, powder and fuses. Mind the sparks.':z.kind==='fence'?'A driftwood shack, a lantern, and a man who never asks where it came from.':z.kind==='registry'?'Ink, wax seals, and a clerk who asks no questions.':z.kind==='governor'?'A powdered wig, a trembling hand, and a very large desk.':'Smell o\' tar and fresh timber.';
   const items=shopItems(z);const box=$('shopItems');box.innerHTML='';
-  items.forEach((it,i)=>{
-    const b=document.createElement('button');b.className='item';b.dataset.i=i;
-    const can=it.ok()&&G.gold>=it.c;b.disabled=!can;
-    b.innerHTML='<span class="k">'+(i+1)+'</span><span class="t"><b></b><span></span></span><span class="p">'+(it.lbl||(it.c?it.c+'g':'Free'))+'</span>';
-    b.querySelector('b').textContent=it.t;b.querySelector('.t span').textContent=it.d;box.appendChild(b);
-  });
+  let cs=null;items.forEach(it=>{if(it.sec)cs=it.sec;else if(cs)it.sec=cs;});
+  const secs=[];items.forEach(it=>{if(it.sec&&!secs.includes(it.sec))secs.push(it.sec);});
+  const cats=G.shopPage==='main'&&secs.length>1;
+  const mkBtn=h=>{const b=document.createElement('button');b.className='item';b.innerHTML=h;return b;};
+  if(cats&&G.shopCat==null){
+    secs.forEach((sec,k)=>{
+      const n=items.filter(i=>i.sec===sec).length;
+      const b=mkBtn('<span class="k">'+(k+1)+'</span><span class="t"><b></b><span>'+n+(n===1?' item':' items')+'</span></span><span class="p">\u203a</span>');
+      b.dataset.cat=sec;b.querySelector('b').textContent=sec;box.appendChild(b);
+    });
+  }else{
+    if(cats){const b=mkBtn('<span class="k">\u2039</span><span class="t"><b></b><span>Back to the categories</span></span><span class="p"></span>');b.dataset.back='1';b.querySelector('b').textContent=G.shopCat;box.appendChild(b);}
+    let n=0;
+    items.forEach((it,i)=>{
+      if(cats&&it.sec!==G.shopCat)return;
+      n++;
+      const b=mkBtn('<span class="k">'+n+'</span><span class="t"><b></b><span></span></span><span class="p">'+(it.lbl||(it.c?it.c+'g':'Free'))+'</span>');b.dataset.i=i;
+      b.disabled=!(it.ok()&&G.gold>=it.c);
+      b.querySelector('b').textContent=it.t;b.querySelector('.t span').textContent=it.d;box.appendChild(b);
+    });
+  }
   $('shopGold').textContent='Yer purse: '+G.gold+' gold';
 }
 function buy(i){
@@ -1075,11 +1110,20 @@ function buy(i){
   if(G.gold<it.c){toast('Not enough gold.','bad');sfx('no');return;}
   G.gold-=it.c;it.run();if(it.c)sfx('coin');else sfx('ui');renderShop();
 }
-shopEl.addEventListener('click',e=>{const b=e.target.closest('.item');if(b&&!b.disabled){buy(+b.dataset.i);b.blur();}});
+function shopPick(b){
+  if(!b||b.disabled)return;
+  if(b.dataset.cat!==undefined){G.shopCat=b.dataset.cat;sfx('ui');renderShop();const bx=$('shopItems');if(bx)bx.scrollTop=0;}
+  else if(b.dataset.back){G.shopCat=null;sfx('ui');renderShop();}
+  else buy(+b.dataset.i);
+}
+shopEl.addEventListener('click',e=>{const b=e.target.closest('.item');if(b&&!b.disabled){shopPick(b);b.blur();}});
 $('shopClose').addEventListener('click',()=>{closeShop();$('shopClose').blur();});
 
 /* ================= movement helpers ================= */
+const CORRALS=[],critters=[];
+function corralHit(x,y,r){for(const c of CORRALS)for(const f of c.fence)if(x>f[0]-r&&x<f[0]+f[2]+r&&y>f[1]-r&&y<f[1]+f[3]+r)return true;return false;}
 function freeFor(x,y,r,mode){
+  if(CORRALS.length&&corralHit(x,y,r))return false;
   const a=tileAt(x-r,y-r),b=tileAt(x+r,y-r),c=tileAt(x-r,y+r),d=tileAt(x+r,y+r);
   if(mode===1)return a<8&&b<8&&c<8&&d<8;
   if(mode===2)return a>=1&&a<8&&b>=1&&b<8&&c>=1&&c<8&&d>=1&&d<8;
@@ -1218,8 +1262,71 @@ function newWander(p){
   for(let k=0;k<12;k++){const a=rr(0,TAU),r=rr(40,260);const x=p.home.x+Math.cos(a)*r,y=p.home.y+Math.sin(a)*r;const t=tileAt(x,y);if(t>=3&&t<=7&&t!==4){p.tx=x;p.ty=y;return;}}
   p.tx=p.home.x;p.ty=p.home.y;
 }
+// Pirate towns (Tortuga, Bonny's Rest): kill a few of their people and the town fights back in waves from the tavern
+// every town without a law (a pirate town) behaves this way, now and for any added later
+const FIGHT_TOWNS=new Proxy({},{get:(o,id)=>{const T=TOWNS.find(t=>t.id===id);return T&&!T.law?T.name:undefined;}});
+const FIGHT_SECS=45,WAVE_EVERY=10;
+function townAnger(id){
+  if(!FIGHT_TOWNS[id]||(G.fight&&G.fight.id===id))return;
+  G.anger=G.anger||{};G.anger[id]=(G.anger[id]||0)+1;
+  if(G.anger[id]>=3)startFight(id);
+}
+function startFight(id){
+  G.anger[id]=0;
+  G.fight={id,t:FIGHT_SECS,wave:0,next:1.5,far:0};
+  for(const q of people)if(q.town===id&&q.kind==='civ'&&!q.dead){q.fightMode=rand()<0.35?'shoot':'melee';q.flee=0;}
+  toast(FIGHT_TOWNS[id]+" has had enough of ye! The pirates draw steel.",'bad');
+}
+function spawnWave(F){
+  const zn=zones.find(z=>z.kind==='tavern'&&z.home===F.id);if(!zn)return;
+  F.wave++;
+  let alive=0;for(const q of people)if(q.raider&&!q.dead)alive++;
+  const n=Math.min(2+F.wave,Math.max(0,14-alive));
+  for(let i=0;i<n;i++){
+    const q=mkFolk('civ',zn.x+rr(-18,18),zn.y+rr(8,26),{town:F.id,raider:true,look:'pirate',coat:['#2c2a31','#6a2a2a','#2a4a6a','#3a3a3a'][ri(0,3)],hat:['bandana','bandana','tricorn','none'][ri(0,3)],weapon:'sword'});
+    q.fightMode=rand()<0.35?'shoot':'melee';q.hp=q.maxhp=26;q.cool=rr(0.3,1.2);
+  }
+  sfx('hit',zn.x,zn.y);
+  toast('Wave '+F.wave+': more pirates pour out of the tavern!','bad');
+}
+function endFight(ok){
+  const F=G.fight;if(!F)return;G.fight=null;
+  for(const q of people)if(q.raider)q.despawn=true;
+  if(ok&&F.wave>0&&!player.dead){const g=30*F.wave;gainGold(g);toast('Ye held out against '+F.wave+' wave'+(F.wave>1?'s':'')+'. The pirates back down. +'+g+' gold','good');}
+  else toast(FIGHT_TOWNS[F.id]+' calms down.');
+}
+function fightTick(dt){
+  const F=G.fight;
+  if(!G.anger)G.anger={};
+  for(const k in G.anger)if(G.anger[k]>0)G.anger[k]=Math.max(0,G.anger[k]-dt/25);
+  let hud=document.getElementById('fightHud');
+  if(!F||G.state!=='play'){if(hud)hud.style.display='none';if(F&&G.state!=='play')G.fight=null;return;}
+  if(player.dead){endFight(false);if(hud)hud.style.display='none';return;}
+  F.t-=dt;F.next-=dt;
+  if(F.next<=0&&F.t>6){F.next=WAVE_EVERY;spawnWave(F);}
+  const T=TOWNS.find(t=>t.id===F.id),cx=(T.x0+T.w/2)*TS,cy=(T.y0+T.h/2)*TS;
+  if(dist(player.x,player.y,cx,cy)>1100){F.far+=dt;if(F.far>6){endFight(false);if(hud)hud.style.display='none';return;}}else F.far=0;
+  if(F.t<=0){endFight(true);if(hud)hud.style.display='none';return;}
+  if(!hud){hud=document.createElement('div');hud.id='fightHud';hud.style.cssText='position:absolute;left:50%;top:92px;transform:translateX(-50%);z-index:20;padding:6px 16px;border-radius:8px;background:rgba(60,12,10,.82);border:1px solid #c0372c;color:#ffd9a8;font:700 15px Georgia,serif;letter-spacing:.06em;pointer-events:none';document.getElementById('stage').appendChild(hud);}
+  hud.style.display='block';hud.textContent=FIGHT_TOWNS[F.id]+' uproar  '+Math.floor(F.t/60)+':'+String(Math.ceil(F.t)%60).padStart(2,'0')+'  \u00b7  Wave '+Math.max(1,F.wave);
+}
+function fightCiv(p,dt){
+  const P=player,dp=dist(p.x,p.y,P.x,P.y);
+  const ang=Math.atan2(P.y-p.y,P.x-p.x);p.a=turnToward(p.a,ang,9,dt);
+  if(p.fightMode==='shoot'){
+    if(dp>260)moveDir(p,ang,92,dt);else if(dp<130)moveDir(p,ang+PI,70,dt);else moveDir(p,ang+p.side*PI/2,40,dt);
+    p.walk+=dt*2;
+    if(dp<380&&p.cool<=0){p.cool=rr(1.8,3);enemyShot(p.x,p.y,ang+rr(-0.12,0.12),7);}
+  }else{
+    if(dp>28){const m=moveDir(p,ang,104,dt);p.walk+=dt*2.4;if(!m){p.stuck+=dt;if(p.stuck>0.5){p.stuck=0;p.side=-p.side;p.sidestep=0.7;}}}
+    if(p.sidestep>0){p.sidestep-=dt;moveDir(p,ang+p.side*PI/2,85,dt);}
+    if(dp<36&&p.cool<=0){p.cool=rr(0.9,1.4);p.swing=0.25;hurtPlayer(6);}
+  }
+}
 function updCiv(p,dt){
   const P=player;
+  if(p.despawn&&dist(p.x,p.y,P.x,P.y)>450){p.dead=true;return;}
+  if(G.fight&&G.fight.id===p.town&&!P.dead&&G.state==='play'&&dist(p.x,p.y,P.x,P.y)<900){if(!p.fightMode)p.fightMode=rand()<0.35?'shoot':'melee';fightCiv(p,dt);return;}
   if(p.flee>0){p.flee-=dt;const a=Math.atan2(p.y-P.y,p.x-P.x)+p.fa;p.a=turnToward(p.a,a,8,dt);moveDir(p,a,108,dt);p.walk+=dt*2.2;return;}
   if(p.wt>0){p.wt-=dt;return;}
   const d=dist(p.x,p.y,p.tx,p.ty);
@@ -1412,16 +1519,17 @@ function swingMelee(){
 }
 function fireGun(){
   const P=player,W=WEAP[G.gun],ak=W.ammo;
+  if(G.gun==='nogun'){if(P.reload<=0){toast('No firearm equipped. Open the weapon wheel.','bad');P.reload=0.6;sfx('no');}return;}
   if((G.ammo[ak]||0)<=0){if(P.reload<=0){toast('Out of '+AMMO_NAME[ak]+'!','bad');P.reload=0.8;sfx('no');}return;}
   G.ammo[ak]--;P.reload=W.rel;P.aimT=1.3;
-  if(G.gun==='bomb'){
+  if(W.thr==='lob'){
     const d=clamp(dist(P.x,P.y,mouse.wx,mouse.wy),70,380),ox=Math.cos(P.a),oy=Math.sin(P.a);
-    bombs.push({x:P.x+ox*14,y:P.y+oy*14,vx:ox*d/0.75,vy:oy*d/0.75,fl:0.75,t:1.2,byPlayer:true});
+    bombs.push({x:P.x+ox*14,y:P.y+oy*14,vx:ox*d/0.75,vy:oy*d/0.75,fl:0.75,t:W.kind==='bomb'?1.2:0.78,byPlayer:true,kind:W.kind});
     sfx('slash',P.x,P.y);return;
   }
   for(let i=0;i<W.pellets;i++){
     const a=P.a+rr(-W.spread,W.spread);
-    bullets.push({x:P.x+Math.cos(a)*16,y:P.y+Math.sin(a)*16,vx:Math.cos(a)*W.speed,vy:Math.sin(a)*W.speed,life:W.life*rr(0.9,1.1),dmg:W.dmg,own:'p',col:W.col,knife:G.gun==='knives'});
+    bullets.push({x:P.x+Math.cos(a)*16,y:P.y+Math.sin(a)*16,vx:Math.cos(a)*W.speed,vy:Math.sin(a)*W.speed,life:W.life*rr(0.9,1.1),dmg:W.dmg,own:'p',col:W.col,knife:W.thr==='blade',kt:W.thr==='blade'?W.ammo:undefined});
   }
   if(!W.silent){
     smoke(P.x+Math.cos(P.a)*22,P.y+Math.sin(P.a)*22,G.gun==='blunder'?5:3,G.gun==='blunder'?9:6);
@@ -1436,14 +1544,189 @@ function bombBlast(x,y,byPlayer){
   for(const sh of ships){if(sh.dead)continue;const d=dist(sh.x,sh.y,x,y);if(d<110)damageShip(sh,38*(1-d/130),'pirate',byPlayer);}
   const P=player;if(!P.dead&&!P.ship){const d=dist(P.x,P.y,x,y);if(d<80)hurtPlayer(Math.round(34*(1-d/90)));}
 }
+/* ================= loadout: two carried weapons (melee, ranged or thrown) ================= */
+const fires=[];
+const isCarryCat=k=>!!WEAP[k]&&!WEAP[k].hidden&&(WEAP[k].cat==='melee'||WEAP[k].cat==='gun'||WEAP[k].cat==='thrown');
+const thrownOwned=()=>THROWN.filter(k=>G.owned[k]);
+function syncCarry(){
+  G.carry=(G.carry||[]).filter((k,i,a)=>isCarryCat(k)&&G.owned[k]&&a.indexOf(k)===i).slice(0,2);
+  const ms=G.carry.filter(k=>WEAP[k].cat==='melee'),gs=G.carry.filter(k=>WEAP[k].cat!=='melee');
+  if(!ms.includes(G.melee))G.melee=ms[0]||'fists';
+  if(!gs.includes(G.gun))G.gun=gs[0]||'nogun';
+}
+function acquireWeapon(k){
+  const w=WEAP[k];G.owned[k]=1;
+  const hand=c=>WEAP[c].cat==='melee'?'m':'r';
+  if(!G.carry.includes(k)){
+    if(G.carry.length<2)G.carry.push(k);
+    else{let i=G.carry.findIndex(c=>hand(c)===hand(k));if(i<0)i=1;const old=G.carry[i];G.carry[i]=k;toast(WEAP[old].n+' went to your stash.');}
+  }
+  if(w.cat==='melee')G.melee=k;else G.gun=k;
+  syncCarry();toast(w.n+' acquired and equipped.','good');
+}
+function stashState(){
+  const P=player,D=G.deck;
+  if(D&&D.stash)return {ok:true};
+  if(D)return {ok:false,why:'There is no stash here.'};
+  if(P.ship)return P.ship.own?{ok:true}:{ok:false,why:'Only your own ship has a stash.'};
+  if(P.horse)return {ok:true};
+  const h=G.steed;if(h&&!h.down&&dist(h.x,h.y,P.x,P.y)<110)return {ok:true};
+  return {ok:false,why:'Stand by your steed, ship or a chest to swap weapons.'};
+}
+function hudW(){
+  const P=player;
+  return '<span><b>LMB</b>'+handLabel(0)+'</span><span><b>RMB</b>'+handLabel(1)+(P.reload>0.05&&handWeapon(1).mode==='fire'?' (loading)':'')+'</span>';
+}
+function swapHands(fromWheel){
+  const P=player;if(P.dead||P.ship||G.stashOpen||(WHEEL.open&&!fromWheel)||G.state!=='play')return;
+  syncCarry();if(G.carry.length<2){toast('You only carry one weapon.');return;}
+  G.carry.reverse();sfx('ui');toast('Hands swapped. LMB: '+WEAP[G.carry[0]].n+'   RMB: '+WEAP[G.carry[1]].n);
+}
+/* slot 0 = left hand (LMB / Space), slot 1 = right hand (RMB / F). Out of throwables? knives and hatchets are swung, everything else is a punch. */
+function handWeapon(h){
+  const k=G.carry[h];
+  if(!k)return {k:'fists',mode:'melee'};
+  const w=WEAP[k];
+  if(w.cat==='melee')return {k,mode:'melee'};
+  if(w.cat==='thrown'&&(G.ammo[w.ammo]|0)<=0){
+    if(k==='knives')return {k:'knifeM',mode:'melee',out:true};
+    if(k==='hatchet')return {k:'hatchetM',mode:'melee',out:true};
+    return {k:'fists',mode:'melee',out:true};
+  }
+  return {k,mode:'fire'};
+}
+function handUse(h,D,held){
+  if(!held)return;const P=player;
+  const hw=handWeapon(h);
+  if(hw.mode==='melee'){if(P.cool>0)return;G.melee=hw.k;P.aimT=0;if(D)deckSwing(D);else swingMelee();}
+  else{if(P.reload>0)return;G.gun=hw.k;if(D)deckFire(D);else fireGun();}
+}
+function heldW(P){const k=P.aimT>0?G.gun:G.melee,base={knifeM:'knives',hatchetM:'hatchet'}[k]||k,i=G.carry.indexOf(base);return {weapon:k,hand:i<0?undefined:i};}
+function handLabel(h){
+  const k=G.carry[h],hw=handWeapon(h);
+  if(!k)return 'Fists';
+  const w=WEAP[k];
+  if(hw.out)return WEAP[hw.k].n+' <i style="opacity:.7">(out of '+(AMMO_NAME[w.ammo]||'ammo')+')</i>';
+  if(w.cat==='melee')return w.n;
+  return w.n+' &times;'+(G.ammo[w.ammo]||0);
+}
+/* ---- stash screen ---- */
+let stashOv=null;
+function stashEl(){
+  if(stashOv)return stashOv;
+  const ov=document.createElement('div');ov.id='stashOv';ov.className='overlay hidden';ov.style.zIndex=60;
+  const card=document.createElement('div');card.className='parch';card.style.textAlign='center';ov.appendChild(card);
+  document.getElementById('pause').parentNode.appendChild(ov);stashOv=ov;return ov;
+}
+function buildStash(){
+  const ov=stashEl(),card=ov.firstChild;card.innerHTML='';
+  const mk=(tag,txt,st)=>{const e=document.createElement(tag);if(txt)e.textContent=txt;if(st)e.style.cssText=st;card.appendChild(e);return e;};
+  mk('h2','Weapon stash','font-size:32px');
+  mk('p','You carry two weapons. Everything else stays here. Throwables are always on you.','font-size:14px;margin:0 0 8px');
+  const btn=(txt,fn,parent)=>{const b=document.createElement('button');b.className='btn ghost';b.style.cssText='display:inline-block;width:auto;margin:3px 4px;padding:6px 12px;font-size:15px';b.textContent=txt;b.addEventListener('click',()=>{b.blur();fn();buildStash();});parent.appendChild(b);return b;};
+  const row=(label,sub)=>{const r=document.createElement('div');r.style.cssText='display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;border:1px solid rgba(80,50,20,.45);border-radius:8px;padding:6px 10px;margin:6px 0;background:rgba(255,248,225,.55)';
+    const l=document.createElement('div');l.style.cssText='text-align:left';l.innerHTML='<b>'+label+'</b>'+(sub?'<div style="font-size:12px;opacity:.75">'+sub+'</div>':'');r.appendChild(l);const bx=document.createElement('div');r.appendChild(bx);card.appendChild(r);return bx;};
+  syncCarry();
+  mk('h3','Carrying ('+G.carry.length+'/2)','margin:10px 0 0;font-size:18px');
+  for(let i=0;i<2;i++){
+    const k=G.carry[i];
+    if(!k){row('Empty hand','free slot');continue;}
+    const w=WEAP[k],bx=row(w.n,w.cat==='melee'?'melee':(AMMO_NAME[w.ammo]||'')+' x'+(G.ammo[w.ammo]|0));
+    btn('Stash it',()=>{G.carry.splice(i,1);syncCarry();sfx('ui');},bx);
+  }
+  const stored=WORDER.filter(k=>isCarryCat(k)&&G.owned[k]&&!G.carry.includes(k));
+  mk('h3','Stored','margin:12px 0 0;font-size:18px');
+  if(!stored.length)mk('p','Nothing stored.','font-size:14px;margin:4px 0');
+  for(const k of stored){
+    const w=WEAP[k],bx=row(w.n,w.cat==='melee'?'melee':(AMMO_NAME[w.ammo]||'')+' x'+(G.ammo[w.ammo]|0));
+    const take=i=>{if(i>=0){const old=G.carry[i];G.carry[i]=k;}else G.carry.push(k);if(w.cat==='melee')G.melee=k;else G.gun=k;syncCarry();sfx('ui');};
+    if(G.carry.length<2)btn('Carry',()=>take(-1),bx);
+    else G.carry.forEach((c,i)=>btn('Swap for '+WEAP[c].n,()=>take(i),bx));
+  }
+  const cl=document.createElement('button');cl.className='btn';cl.style.cssText='display:block;width:100%;margin-top:12px';cl.textContent='Done';cl.addEventListener('click',()=>{cl.blur();closeStash();});card.appendChild(cl);
+}
+function openStash(){
+  const st=stashState();if(!st.ok){toast(st.why,'bad');return;}
+  if(WHEEL.close)WHEEL.close();
+  G.stashOpen=true;mouse.down=false;mouse.rdown=false;
+  buildStash();stashEl().classList.remove('hidden');
+}
+function closeStash(){G.stashOpen=false;if(stashOv)stashOv.classList.add('hidden');if(wardOv)wardOv.classList.add('hidden');if(invOv)invOv.classList.add('hidden');if(G.deck)G.deck.stash=false;}
+/* ---- thrown effects: rum bottles shatter, molotovs burn, grenados blow ---- */
+function bombEnd(b,D){
+  const k=b.kind||'bomb';
+  if(k==='bomb'){if(D)deckBlast(D,b.x,b.y);else bombBlast(b.x,b.y,b.byPlayer);return;}
+  if(k==='rum')return bottleShatter(b,D);
+  return moloBurst(b,D);
+}
+function glassFx(x,y,col){for(let i=0;i<14;i++){const a=rr(0,TAU),v=rr(30,120);addP(x,y,Math.cos(a)*v,Math.sin(a)*v,rr(0.25,0.6),rr(1.5,3),col||'rgba(190,235,205,.9)');}}
+function bottleShatter(b,D){
+  glassFx(b.x,b.y);sfx('slash',b.x,b.y);
+  if(D){D.noise=Math.max(D.noise||0,0.8);for(const e of D.enemies){if(e.dead||e.boss)continue;const d=Math.hypot(e.x-b.x,e.y-b.y);if(d<34)hurtE(D,e,16,Math.atan2(e.y-b.y,e.x-b.x),90);}}
+  else{
+    if(tileAt(b.x,b.y)<=1){addP(b.x,b.y,0,0,0.5,6,'rgba(255,255,255,.8)',{grow:30,ring:true,layer:0});return;}
+    alarm(b.x,b.y,360);
+    for(const p of people){if(p.dead)continue;if(dist(p.x,p.y,b.x,b.y)<34)hurtPerson(p,16,Math.atan2(p.y-b.y,p.x-b.x),!!b.byPlayer);}
+  }
+}
+function moloBurst(b,D){
+  glassFx(b.x,b.y,'rgba(255,200,120,.95)');sfx('boom',b.x,b.y);
+  if(!D&&tileAt(b.x,b.y)<=1){addP(b.x,b.y,0,0,0.5,6,'rgba(255,255,255,.8)',{grow:30,ring:true,layer:0});return;}
+  const list=D?(D.fires||(D.fires=[])):fires;
+  list.push({x:b.x,y:b.y,r:46,t:6,tick:0.1});
+  if(D)D.noise=1;else alarm(b.x,b.y,420);
+}
+function fireStep(list,dt,D){
+  if(!list||!list.length)return;
+  for(const f of list){
+    f.t-=dt;f.tick-=dt;
+    if(Math.random()<dt*28)addP(f.x+rr(-f.r*0.7,f.r*0.7),f.y+rr(-f.r*0.5,f.r*0.5),rr(-8,8),rr(-40,-18),rr(0.3,0.6),rr(2,4),Math.random()<0.5?'rgba(255,150,40,.9)':'rgba(255,220,110,.9)',{layer:1});
+    if(f.tick<=0){
+      f.tick=0.45;
+      if(D){
+        for(const e of D.enemies){if(e.dead||e.boss)continue;if(Math.hypot(e.x-f.x,e.y-f.y)<f.r)hurtE(D,e,9,Math.atan2(e.y-f.y,e.x-f.x),30);}
+        if(!player.dead&&Math.hypot(D.p.x-f.x,D.p.y-f.y)<f.r*0.85)hurtPlayer(5);
+      }else{
+        for(const p of people){if(p.dead)continue;if(dist(p.x,p.y,f.x,f.y)<f.r)hurtPerson(p,9,Math.atan2(p.y-f.y,p.x-f.x),true);}
+        const P=player;if(!P.dead&&!P.ship&&dist(P.x,P.y,f.x,f.y)<f.r*0.85)hurtPlayer(5);
+      }
+    }
+  }
+  compact(list,f=>f.t>0);
+}
+function drawFires(list){
+  if(!list)return;
+  for(const f of list){
+    const a=Math.min(1,f.t/1.2),fl=0.85+0.15*Math.sin(G.t*14+f.x),R=f.r*fl;
+    const gr=ctx.createRadialGradient(f.x,f.y,2,f.x,f.y,R);
+    gr.addColorStop(0,'rgba(255,230,120,'+(0.75*a).toFixed(3)+')');gr.addColorStop(0.55,'rgba(255,120,30,'+(0.5*a).toFixed(3)+')');gr.addColorStop(1,'rgba(200,40,10,0)');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(f.x,f.y,R,0,TAU);ctx.fill();
+  }
+}
+function drawBombs(list,lf){
+  for(const b of list){
+    ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(b.x+2,b.y+3,5,3,0,0,TAU);ctx.fill();
+    const y=b.y-lf;
+    if(b.kind==='rum'||b.kind==='molo'){
+      ctx.save();ctx.translate(b.x,y);ctx.rotate(G.t*9);ctx.fillStyle='#2f7d46';ctx.fillRect(-2.5,-4,5,8);ctx.fillRect(-1.2,-7,2.4,3.2);
+      if(b.kind==='molo'){ctx.fillStyle=(Math.floor(G.t*16)%2)?'#ffb347':'#ff5a2a';ctx.beginPath();ctx.arc(0,-8,2.6,0,TAU);ctx.fill();}
+      ctx.restore();
+    }else{
+      ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(b.x,y,5,0,TAU);ctx.fill();
+      ctx.fillStyle=(Math.floor(G.t*14)%2)?'#ffb347':'#ff5a2a';ctx.beginPath();ctx.arc(b.x+3,y-5,2.2,0,TAU);ctx.fill();
+    }
+  }
+}
+
 function updateBombs(dt){
   for(const b of bombs){
     b.t-=dt;
     if(b.fl>0){b.fl-=dt;const nx=b.x+b.vx*dt,ny=b.y+b.vy*dt;if(tileAt(nx,ny)>=8){b.vx*=-0.2;b.vy*=-0.2;b.fl=0;}else{b.x=nx;b.y=ny;}}
-    if(Math.random()<0.7)addP(b.x+3,b.y-5,rr(-12,12),rr(-12,12),0.25,2,'rgba(255,170,60,.9)');
-    if(b.t<=0){b.dead=true;bombBlast(b.x,b.y,b.byPlayer);}
+    if(Math.random()<0.7)addP(b.x+3,b.y-5,rr(-12,12),rr(-12,12),0.25,2,b.kind==='rum'?'rgba(150,230,170,.8)':'rgba(255,170,60,.9)');
+    if(b.t<=0){b.dead=true;bombEnd(b,null);}
   }
   compact(bombs,b=>!b.dead);
+  fireStep(fires,dt,null);
 }
 /* ---- horses ---- */
 const HCOL=[['#7a4a2a','#2a1a10'],['#2a2420','#0e0c0a'],['#e8e4dc','#8a8478'],['#a0602c','#4a2a12'],['#d9b26a','#7a5a2a']];
@@ -1574,18 +1857,90 @@ function whistle(){
   h.follow=true;
   toast('You whistle. '+h.name+' is on the way and will follow you. Press H again to make it wait.','good');
 }
+
+/* ---- corrals: fenced pens with farm animals beside each stable ---- */
+function buildCorrals(){
+  CORRALS.length=0;critters.length=0;
+  const kinds=[['cow','pig'],['goat','sheep'],['pig','goat'],['sheep','cow']];let ci=0;
+  for(const zn of zones){
+    if(zn.kind!=='stable')continue;
+    const CW=7,CH=5,cand=[];
+    for(let dy=-12;dy<=12;dy++)for(let dx=-16;dx<=16;dx++)cand.push([dx,dy,dx*dx+dy*dy]);
+    cand.sort((a,b)=>a[2]-b[2]);
+    const tx0=Math.floor(zn.x/TS),ty0=Math.floor(zn.y/TS);
+    for(const [dx,dy] of cand){
+      const x0=tx0+dx,y0=ty0+dy;let ok=true;
+      for(let y=y0-1;y<=y0+CH&&ok;y++)for(let x=x0-1;x<=x0+CW&&ok;x++){const t=tiles[ix(x,y)];if(!(t===TL.GRASS||t===TL.SAND||t===TL.STREET))ok=false;}
+      if(!ok)continue;
+      const cx=(x0+CW/2)*TS,cy=(y0+CH/2)*TS;
+      for(const z2 of zones)if(dist(z2.x,z2.y,cx,cy)<z2.r+TS*5)ok=false;
+      for(const c2 of CORRALS)if(dist(c2.cx,c2.cy,cx,cy)<TS*12)ok=false;
+      if(!ok)continue;
+      const X0=x0*TS,Y0=y0*TS,W=CW*TS,H=CH*TS,th=6,gap=TS*1.6;
+      const fence=[[X0,Y0,W,th],[X0,Y0,th,H],[X0+W-th,Y0,th,H],[X0,Y0+H-th,(W-gap)/2,th],[X0+(W+gap)/2,Y0+H-th,(W-gap)/2,th]];
+      const c={x0:X0,y0:Y0,w:W,h:H,cx,cy,fence,kinds:kinds[ci++%kinds.length]};
+      CORRALS.push(c);
+      for(let y=y0;y<y0+CH;y++)for(let x=x0;x<x0+CW;x++)decor[y*MW+x]=0;
+      const n=ri(3,5);
+      for(let i=0;i<n;i++){const k=c.kinds[i%2];critters.push({k,c,x:X0+TS*(0.8+rand()*(CW-1.6)),y:Y0+TS*(0.8+rand()*(CH-1.8)),a:rr(0,TAU),tx:0,ty:0,wt:rr(0,3),walk:rand()*9,col:k==='cow'?(rand()<0.5?'#f1ece0':'#5a3a24'):k==='pig'?'#e8a8a0':k==='goat'?'#cfc6b4':'#f4f1ea'});}
+      for(const pp of people)if(pp.x>X0-10&&pp.x<X0+W+10&&pp.y>Y0-10&&pp.y<Y0+H+10){pp.x=X0+W/2;pp.y=Y0+H+26;pp.home={x:pp.x,y:pp.y};pp.tx=pp.x;pp.ty=pp.y;}
+      break;
+    }
+  }
+}
+function updateCritters(dt){
+  const P=player;
+  for(const q of critters){
+    if(Math.abs(q.x-P.x)>1400||Math.abs(q.y-P.y)>1400)continue;
+    const c=q.c;
+    if(q.wt>0){q.wt-=dt;continue;}
+    if(!q.tx||dist(q.x,q.y,q.tx,q.ty)<6){q.tx=c.x0+TS*(0.8+rand()*(c.w/TS-1.6));q.ty=c.y0+TS*(0.8+rand()*(c.h/TS-1.8));q.wt=rr(1.5,6);continue;}
+    const a=Math.atan2(q.ty-q.y,q.tx-q.x);q.a=turnToward(q.a,a,4,dt);
+    const sp=q.k==='pig'?20:15;q.x+=Math.cos(q.a)*sp*dt;q.y+=Math.sin(q.a)*sp*dt;q.walk+=dt*4;
+    q.x=clamp(q.x,c.x0+12,c.x0+c.w-12);q.y=clamp(q.y,c.y0+12,c.y0+c.h-16);
+  }
+}
+function drawCritter(q){
+  const L=q.k==='cow'?15:q.k==='pig'?12:q.k==='goat'?10:11,W=L*0.6;
+  ctx.save();ctx.translate(q.x,q.y);ctx.rotate(q.a);
+  ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(1,3,L,W,0,0,TAU);ctx.fill();
+  ctx.fillStyle=q.col;ctx.beginPath();ctx.ellipse(0,0,L,W,0,0,TAU);ctx.fill();
+  if(q.k==='cow'&&q.col==='#f1ece0'){ctx.fillStyle='#3a2a20';ctx.beginPath();ctx.ellipse(-3,2,5,3,0.4,0,TAU);ctx.fill();}
+  if(q.k==='sheep'){ctx.fillStyle='rgba(255,255,255,.7)';for(let i=-1;i<=1;i++){ctx.beginPath();ctx.arc(i*4,0,5,0,TAU);ctx.fill();}}
+  ctx.fillStyle=q.k==='sheep'?'#3a3430':q.col;ctx.beginPath();ctx.ellipse(L*0.85,0,L*0.38,W*0.55,0,0,TAU);ctx.fill();
+  if(q.k==='goat'||q.k==='cow'){ctx.strokeStyle='#e8e0c8';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(L*0.95,-3);ctx.lineTo(L*1.1,-6);ctx.moveTo(L*0.95,3);ctx.lineTo(L*1.1,6);ctx.stroke();}
+  ctx.restore();
+}
+function drawCorrals(TKr,vx0,vy0,vx1,vy1){
+  for(const c of CORRALS){
+    if(c.x0>vx1||c.x0+c.w<vx0||c.y0>vy1||c.y0+c.h<vy0)continue;
+    if(TKr<1){
+      Q(c.y0,()=>{ctx.fillStyle='rgba(120,90,50,.18)';ctx.fillRect(c.x0,c.y0,c.w,c.h);tBox(c.x0,c.y0,c.w,6,12,'#9a7a4a','#6b4a2b',false);tBox(c.x0,c.y0,6,c.h,12,'#9a7a4a','#6b4a2b',false);tBox(c.x0+c.w-6,c.y0,6,c.h,12,'#9a7a4a','#6b4a2b',false);});
+      Q(c.y0+c.h,()=>{const g=TS*1.6;tBox(c.x0,c.y0+c.h-6,(c.w-g)/2,6,12,'#9a7a4a','#6b4a2b',false);tBox(c.x0+(c.w+g)/2,c.y0+c.h-6,(c.w-g)/2,6,12,'#9a7a4a','#6b4a2b',false);});
+    }else{
+      ctx.fillStyle='rgba(120,90,50,.18)';ctx.fillRect(c.x0,c.y0,c.w,c.h);
+      ctx.fillStyle='#8a6a3c';for(const f of c.fence)ctx.fillRect(f[0],f[1],f[2],f[3]);
+      ctx.fillStyle='#5a3f22';for(const f of c.fence){if(f[2]>f[3])for(let x=f[0];x<f[0]+f[2];x+=14)ctx.fillRect(x,f[1]-1,3,f[3]+2);else for(let y=f[1];y<f[1]+f[3];y+=14)ctx.fillRect(f[0]-1,y,f[2]+2,3);}
+    }
+  }
+  for(const q of critters){
+    if(q.x<vx0||q.x>vx1||q.y<vy0||q.y>vy1)continue;
+    if(TKr<1)Q(q.y,()=>upr(q.x,q.y,()=>{ctx.translate(-q.x,-q.y);drawCritter(q);}));else drawCritter(q);
+  }
+}
 function spawnHorses(){
   for(const I of ISL){
     if(I.r<16)continue;
-    const n=Math.floor(I.r/9);
+    const n=Math.max(1,Math.floor(I.r/22));
     for(let k=0,got=0;k<300&&got<n;k++){
       const a=rr(0,TAU),r=Math.sqrt(rand())*I.r*0.7,x=(I.cx+Math.cos(a)*r)*TS,y=(I.cy+Math.sin(a)*r)*TS;
       if(tileAt(x,y)===TL.GRASS&&freeFor(x,y,10,0)){const hh=mkHorse(x,y);hh.wild=true;wildBreed(hh);got++;}
     }
   }
-  for(const T of TOWNS)for(let i=0;i<3;i++){const q=randTownPos(T);mkHorse(q.x,q.y);}
+  for(const T of TOWNS)for(let i=0;i<1;i++){const q=randTownPos(T);mkHorse(q.x,q.y);}
 }
 function updateHorses(dt){
+  updateCritters(dt);
   const P=player;
   for(const h of horses){
     if(h.callT>0)h.callT-=dt;
@@ -1665,13 +2020,14 @@ function updatePlayerControls(dt){
       s.turn=clamp(da*2.4,-1,1);
       s.thr=Math.min(1,pad.sm)*(ad>1.9?0.25:0.3+0.7*Math.max(0,Math.cos(ad)));
     }
+    if(isDrunk()){s.turn=clamp(s.turn+Math.sin(G.t*1.1)*0.5,-1,1);s.thr*=0.8+0.2*Math.sin(G.t*0.7);}
     if(mouse.down||keys.Space){fireBroadside(s,aimSide(s));fireBow(s);}
     if(mouse.rdown)fireSpecial(s);
     P.a=s.a;
   }else{
     const px=P.x,py=P.y,t0=tileAt(P.x,P.y);
     let dx=ixn,dy=iyn;let l=Math.hypot(dx,dy);if(l>0){dx/=l;dy/=l;}
-    if(pad.fm>0&&l===0){dx=pad.fx*pad.fm;dy=pad.fy*pad.fm;l=pad.fm;}
+    if(pad.fm>0&&l===0){dx=pad.fx*pad.fm;dy=pad.fy*pad.fm;l=pad.fm;}if(isDrunk()&&!player.horse){dx=-dx;dy=-dy;}
     const sprint=keys.ShiftLeft||keys.ShiftRight;
     if(P.horse&&G.taming&&G.taming.h===P.horse){doTaming(dt);P.a=Math.atan2(mouse.wy-P.y,mouse.wx-P.x);P.vx=0;P.vy=0;return;}
     if(P.horse){
@@ -1685,7 +2041,8 @@ function updatePlayerControls(dt){
         h.stam=Math.min(st.stam,h.stam+st.regen*dt*(moving?0.6:1.4));
         if(h.winded&&h.stam>=st.stam*0.3)h.winded=false;
       }
-      const k=1-Math.exp(-dt*5);
+      const k=1-Math.exp(-dt*(isDrunk()?1.0:5));
+      if(isDrunk())spd*=0.7;
       P.hvx+=(dx*spd-P.hvx)*k;P.hvy+=(dy*spd-P.hvy)*k;
       {const nn=Math.max(1,Math.ceil(Math.hypot(P.hvx,P.hvy)*dt/8));let okm=true;for(let q=0;q<nn;q++)if(!moveFolk(P,P.hvx*dt/nn,P.hvy*dt/nn,9,2)){okm=false;break;}if(!okm){P.hvx*=0.5;P.hvy*=0.5;}}
       const sp=Math.hypot(P.hvx,P.hvy);
@@ -1704,8 +2061,7 @@ function updatePlayerControls(dt){
     P.a=Math.atan2(mouse.wy-P.y,mouse.wx-P.x);
     P.vx=(P.x-px)/Math.max(dt,0.001);P.vy=(P.y-py)/Math.max(dt,0.001);
     if(t0!==TL.DEEP){
-      if((mouse.down||keys.Space)&&P.cool<=0)swingMelee();
-      if((mouse.rdown||keys.KeyF)&&P.reload<=0)fireGun();
+      handUse(0,null,mouse.down||keys.Space);handUse(1,null,mouse.rdown||keys.KeyF);
     }
   }
 }
@@ -1754,10 +2110,69 @@ function maintain(dt){
       if(nearLand||tileAt(P.x,P.y)>=2)spawnSoldierNear();
     }
   }
-  const idle=ships.filter(q=>q.fac==='pirate'&&!q.crew&&!q.dead&&!q.own);
-  if(idle.length>6){idle.sort((a,b)=>dist(b.x,b.y,P.x,P.y)-dist(a.x,a.y,P.x,P.y));if(dist(idle[0].x,idle[0].y,P.x,P.y)>1200)idle[0].dead=true;}
+  sweepIdleShips(1.7,false);
+  G.refillT=(G.refillT||0)+1.7;
+  if(G.refillT>20){
+    G.refillT=0;
+    for(const T of TOWNS){
+      if(G.fight&&G.fight.id===T.id)continue;
+      const cx=(T.x0+T.w/2)*TS,cy=(T.y0+T.h/2)*TS;if(dist(cx,cy,P.x,P.y)<650)continue;
+      let n=0;for(const q of people)if(q.town===T.id&&!q.dead&&!q.raider)n++;
+      if(n<(T.law?14:12)){const q=randTownPos(T);if(T.law)mkFolk('civ',q.x,q.y,{town:T.id,law:true});else mkFolk('civ',q.x,q.y,{town:T.id,look:'pirate',coat:['#2c2a31','#6a2a2a','#2a4a6a','#3a3a3a'][ri(0,3)],hat:['bandana','bandana','tricorn','none'][ri(0,3)],weapon:rand()<0.5?'sword':null});}
+    }
+  }
+  G.sweepT=(G.sweepT||0)+1.7;if(G.sweepT>45){G.sweepT=0;sweepPeople(false);sweepStuckShips();}
+}
+// idle ships: unowned, crewless, not a mooring, not the last ship the player used. They go after a minute out of sight.
+function sweepIdleShips(dt,now){
+  const P=player;let n=0;
+  for(const q of ships){
+    if(q.dead||q.crew||q.own||q.boss||q.keep||q===P.ship||q===G.lastShip)continue;
+    if(q.fac!=='pirate')continue;
+    const d=dist(q.x,q.y,P.x,P.y);
+    if(d<(now?300:800)){q.idleT=0;continue;}
+    q.idleT=(q.idleT||0)+dt;
+    if(now||q.idleT>60){q.dead=true;n++;}
+  }
+  return n;
+}
+// AI ships that have not gone anywhere for a long while get moved to open water
+function sweepStuckShips(){
+  const P=player;let n=0;
+  for(const q of ships){
+    if(q.dead||q.crew!=='ai'||q.boss)continue;
+    if(q.sx===undefined||dist(q.x,q.y,q.sx,q.sy)>60){q.sx=q.x;q.sy=q.y;q.sT=0;continue;}
+    q.sT=(q.sT||0)+45;
+    if(q.sT>=90&&dist(q.x,q.y,P.x,P.y)>900){const c=randDeep();if(c&&dist(c.x,c.y,P.x,P.y)>900){q.x=c.x;q.y=c.y;q.v=0;q.sx=c.x;q.sy=c.y;q.sT=0;n++;}}
+  }
+  return n;
+}
+// town folk: anyone who has not moved in a long while (or all of them, on a manual sweep) goes back home
+function sweepPeople(now){
+  const P=player;let n=0;
+  for(const p of people){
+    if(p.dead||p.reinforce||p.kind==='skel'||p.flee>0&&!now)continue;
+    if(p.quest||p.story||p.mission||p.npc||p.keep)continue;
+    if(p.sx===undefined||dist(p.x,p.y,p.sx,p.sy)>10){p.sx=p.x;p.sy=p.y;p.sT=0;if(!now)continue;}
+    p.sT=(p.sT||0)+45;
+    if(!now&&p.sT<90)continue;
+    const d=dist(p.x,p.y,P.x,P.y);
+    if(d<(now?260:520)||!p.home)continue;
+    p.x=p.home.x;p.y=p.home.y;p.tx=p.x;p.ty=p.y;p.kx=0;p.ky=0;p.stuck=0;p.flee=0;p.wt=rr(0,3);p.sidestep=0;p.sx=p.x;p.sy=p.y;p.sT=0;
+    if(p.kind==='soldier'){p.hurt=0;if(p.st!=='patrol')p.st='patrol';p.hp=Math.max(p.hp,p.maxhp);}
+    n++;
+  }
+  return n;
+}
+function cleanSweep(){
+  if(G.state!=='play'||G.deck)return false;
+  const a=sweepPeople(true),b=sweepIdleShips(0,true),c=sweepStuckShips();
+  compact(ships,s=>!s.dead);
+  toast('Swept the seas: '+a+' folk sent home, '+b+' idle ships cleared'+(c?', '+c+' stuck ships moved':'')+'.','good');
+  return true;
 }
 function updateHeat(dt){
+  fightTick(dt);
   G.seen=G.seenNext;G.seenNext=false;
   if(G.marque>0){G.marque-=dt;if(G.marque<=0)toast('Yer letter of marque has expired.','bad');}
   if(G.heat>0){
@@ -1765,8 +2180,8 @@ function updateHeat(dt){
     else{
       G.unseen+=dt;
       const I=ISL_T,haven=dist(player.x/TS,player.y/TS,I.cx,I.cy)<I.r*0.75;
-      const rate=3.5+(haven?7:0);
-      if(G.unseen>4){G.coolRate=rate;G.heat=Math.max(0,G.heat-rate*dt);}else G.coolRate=0;
+      const rate=2.4+(haven?5.5:0);
+      if(G.unseen>6){G.coolRate=rate;G.heat=Math.max(0,G.heat-rate*dt);}else G.coolRate=0;
       if(G.heat<=0){G.lastSeen=null;G.coolRate=0;toast('The Navy lost track of ye.','good');}
     }
   }else{G.coolRate=0;G.lastSeen=null;}
@@ -1886,6 +2301,7 @@ function drawShip(s){
   }
 }
 function drawFolk(o){
+  if(o.weapon==='knifeM')o.weapon='knives';else if(o.weapon==='hatchetM')o.weapon='hatchet';
   if(TILT())return tFolk(o);
   ctx.save();ctx.translate(o.x,o.y);if(o.scale&&o.scale!==1)ctx.scale(o.scale,o.scale);
   ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(2,3,9,8,0,0,TAU);ctx.fill();
@@ -1893,10 +2309,14 @@ function drawFolk(o){
   const sw=Math.sin((o.walk||0)*9)*3;
   ctx.fillStyle='#2a1c12';ctx.beginPath();ctx.ellipse(sw,5,4,2.6,0,0,TAU);ctx.fill();ctx.beginPath();ctx.ellipse(-sw,-5,4,2.6,0,0,TAU);ctx.fill();
   const wp=o.weapon;
+  ctx.save();if(o.hand===0)ctx.scale(1,-1);
   if(wp==='musket'){ctx.strokeStyle='#4a3320';ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(-2,6);ctx.lineTo(19,3);ctx.stroke();ctx.strokeStyle='#9a9a9a';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(8,4.6);ctx.lineTo(21,2.6);ctx.stroke();}
   else if(wp==='pistol'||wp==='duel'){ctx.strokeStyle=wp==='duel'?'#6a4a2a':'#222';ctx.lineWidth=2.6;ctx.beginPath();ctx.moveTo(4,5);ctx.lineTo(wp==='duel'?16:13,4);ctx.stroke();}
   else if(wp==='blunder'){ctx.strokeStyle='#4a3320';ctx.lineWidth=3.2;ctx.beginPath();ctx.moveTo(-1,6);ctx.lineTo(14,4);ctx.stroke();ctx.fillStyle='#c9a24a';ctx.beginPath();ctx.moveTo(14,2.6);ctx.lineTo(22,0.5);ctx.lineTo(22,7.5);ctx.lineTo(14,5.4);ctx.closePath();ctx.fill();}
   else if(wp==='bomb'){ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(8,6,4,0,TAU);ctx.fill();ctx.strokeStyle='#d9a25a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(10,3);ctx.lineTo(12,0);ctx.stroke();ctx.fillStyle='#ffb347';ctx.beginPath();ctx.arc(12,0,1.6,0,TAU);ctx.fill();}
+  else if(wp==='rum'){ctx.fillStyle='#2f7d46';ctx.fillRect(6,3,4,7);ctx.fillRect(7.2,0.5,1.6,3);}
+  else if(wp==='molo'){ctx.fillStyle='#2f7d46';ctx.fillRect(6,3,4,7);ctx.fillStyle='#ffb347';ctx.beginPath();ctx.arc(8,1.5,2.2,0,TAU);ctx.fill();}
+  else if(wp==='hatchet'){ctx.strokeStyle='#6a4a2a';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(4,6);ctx.lineTo(12,6);ctx.stroke();ctx.fillStyle='#c9ced8';ctx.fillRect(11,3,3,6);}
   else if(wp==='knives'){ctx.strokeStyle='#dfe4ee';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(4,6);ctx.lineTo(13,6);ctx.stroke();ctx.strokeStyle='#5a3a1a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(2,6);ctx.lineTo(5,6);ctx.stroke();}
   else if(wp==='sword'||wp==='cutlass'||wp==='rapier'||wp==='axe'){
     const sm=o.swingMax||0.28,pr=o.swing>0?1-o.swing/sm:0;
@@ -1909,15 +2329,16 @@ function drawFolk(o){
     else{ctx.strokeStyle='#8a6a2a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(0,-2.6);ctx.lineTo(0,2.6);ctx.stroke();}
     ctx.restore();
   }
+  ctx.restore();
   ctx.fillStyle=o.coat;ctx.beginPath();ctx.ellipse(0,0,6,9.5,0,0,TAU);ctx.fill();
   ctx.fillStyle=o.coat2;ctx.fillRect(-1,-9,2.4,18);
   ctx.fillStyle=o.coat;ctx.beginPath();ctx.arc(3,8.2,3.2,0,TAU);ctx.fill();ctx.beginPath();ctx.arc(3,-8.2,3.2,0,TAU);ctx.fill();
   ctx.fillStyle=o.skin;ctx.beginPath();ctx.arc(1,0,5,0,TAU);ctx.fill();
   switch(o.hat){
-    case 'tricorn':ctx.fillStyle='#1c1c22';ctx.beginPath();for(let i=0;i<3;i++){const a=i/3*TAU;ctx.lineTo(Math.cos(a)*8.5,Math.sin(a)*8.5);ctx.lineTo(Math.cos(a+PI/3)*4.5,Math.sin(a+PI/3)*4.5);}ctx.closePath();ctx.fill();ctx.strokeStyle='#c9a74a';ctx.lineWidth=0.8;ctx.stroke();break;
-    case 'bandana':ctx.fillStyle='#c0372c';ctx.beginPath();ctx.arc(0.5,0,5.2,0,TAU);ctx.fill();ctx.beginPath();ctx.ellipse(-6,2,3.5,1.8,0.5,0,TAU);ctx.fill();break;
+    case 'tricorn':ctx.fillStyle=o.hatc||'#1c1c22';ctx.beginPath();for(let i=0;i<3;i++){const a=i/3*TAU;ctx.lineTo(Math.cos(a)*8.5,Math.sin(a)*8.5);ctx.lineTo(Math.cos(a+PI/3)*4.5,Math.sin(a+PI/3)*4.5);}ctx.closePath();ctx.fill();ctx.strokeStyle='#c9a74a';ctx.lineWidth=0.8;ctx.stroke();break;
+    case 'bandana':ctx.fillStyle=o.hatc||'#c0372c';ctx.beginPath();ctx.arc(0.5,0,5.2,0,TAU);ctx.fill();ctx.beginPath();ctx.ellipse(-6,2,3.5,1.8,0.5,0,TAU);ctx.fill();break;
     case 'straw':ctx.fillStyle='#d9bd72';ctx.beginPath();ctx.arc(0.5,0,8,0,TAU);ctx.fill();ctx.fillStyle='#b99a52';ctx.beginPath();ctx.arc(0.5,0,3.6,0,TAU);ctx.fill();break;
-    case 'cap':ctx.fillStyle='#3a4a6a';ctx.beginPath();ctx.arc(0.5,0,5.4,0,TAU);ctx.fill();break;
+    case 'cap':ctx.fillStyle=o.hatc||'#3a4a6a';ctx.beginPath();ctx.arc(0.5,0,5.4,0,TAU);ctx.fill();break;
     case 'skull':ctx.fillStyle='#222';ctx.beginPath();ctx.arc(3.2,-1.8,1.1,0,TAU);ctx.arc(3.2,1.8,1.1,0,TAU);ctx.fill();ctx.strokeStyle='#b9b29a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-3,-6);ctx.lineTo(-3,6);ctx.moveTo(-6,-3);ctx.lineTo(-6,3);ctx.stroke();break;
     default:ctx.fillStyle='#4a3320';ctx.beginPath();ctx.arc(-0.5,0,4.6,PI*0.5,PI*1.5,true);ctx.fill();
   }
@@ -2041,7 +2462,7 @@ function render(){
   const TKr=TKV();drawQ=null;
   ctx.setTransform(DPR,0,0,DPR,0,0);
   ctx.fillStyle='#0b4070';ctx.fillRect(0,0,VW,VH);
-  const z=cam.z,sh=G.shake,ox=sh?rr(-sh,sh):0,oy=sh?rr(-sh,sh):0;
+  const z=cam.z,sh=G.shake*OPT.shake,ox=sh?rr(-sh,sh):0,oy=sh?rr(-sh,sh):0;
   ctx.setTransform(DPR*z,0,0,DPR*z*TKr,DPR*(VW/2-cam.x*z+ox),DPR*(VH/2-cam.y*z*TKr+oy));
   const hw=VW/2/z+TS,hh=VH/2/(z*TKr)+TS;
   const vx0=cam.x-hw,vx1=cam.x+hw,vy0=cam.y-hh,vy1=cam.y+hh+(TKr<1?200/(z*TKr):0);
@@ -2072,13 +2493,14 @@ function render(){
     }else if(t===TL.SAND&&shade[i]%7===0){ctx.fillStyle='rgba(180,150,90,.18)';ctx.fillRect(wx+shade[i]%20,wy+(shade[i]>>3)%22,6,3);}
   }
   // decor + trees
-  drawQ=TKr<1?[]:null;
+  drawQ=TKr<1?[]:null;const topTrees=[];
   for(let ty=ty0;ty<=ty1;ty++)for(let tx=tx0;tx<=tx1;tx++){
     const i=ty*MW+tx,d=decor[i];if(!d)continue;
     const cx=tx*TS+TS/2,cy=ty*TS+TS/2;
-    if(d>=9){const o=shade[i];if(TKr<1)Q(cy+8,()=>tTree(cx,cy,d-9,o));else ctx.drawImage(spr.tree[d-9],cx-36+(o%9)-4,cy-36+((o>>3)%9)-4);}
+    if(d>=9){const o=shade[i];if(TKr<1)Q(cy+8,()=>tTree(cx,cy,d-9,o));else topTrees.push(cx-36+(o%9)-4,cy-36+((o>>3)%9)-4,d-9);}
     else{const s=d===1?spr.bush:d===2?spr.rock:d===3?spr.shell:spr.bones;if(TKr<1)upr(cx,cy,()=>ctx.drawImage(s,-16,-24));else ctx.drawImage(s,cx-16,cy-16);}
   }
+  drawCorrals(TKr,vx0,vy0,vx1,vy1);
   // skull altar
   if(Math.abs(SK.altar.x-cam.x)<hw+100&&Math.abs(SK.altar.y-cam.y)<hh+100){
     const ax=SK.altar.x,ay=SK.altar.y;ctx.fillStyle='#7c7f89';ctx.beginPath();ctx.arc(ax,ay,46,0,TAU);ctx.fill();ctx.fillStyle='#9a9ea8';ctx.beginPath();ctx.arc(ax,ay,38,0,TAU);ctx.fill();
@@ -2100,6 +2522,7 @@ function render(){
     ctx.strokeStyle=cfg.c;ctx.lineWidth=3;ctx.beginPath();ctx.arc(zn.x,zn.y,cfg.pr+Math.sin(T*3)*2.5,0,TAU);ctx.stroke();drawLabelGlyph(zn.x,zn.y,cfg.g,cfg.gc);
   }
   drawParts(0);
+  drawFires(fires);
   // mission world markers
   const mt=missionTarget();
   if(mt){
@@ -2119,15 +2542,20 @@ function render(){
   const P=player;
   if(!P.ship&&!P.dead&&G.state==='play'){
     const wet=tileAt(P.x,P.y)===TL.DEEP;
-    Q(P.y+1,()=>drawFolk({x:P.x,y:P.y,a:P.a,coat:'#2b2630',coat2:'#b02a2a',skin:'#d9a878',hat:'bandana',walk:P.horse?0:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:P.aimT>0?G.gun:G.melee,flash:P.flash,lift:P.horse?(Math.sin(P.ha)>0.62?32:Math.sin(P.ha)<-0.62?28:22):0,sink:P.horse?0:(tileAt(P.x,P.y)===TL.DEEP?2:tileAt(P.x,P.y)===TL.SHALLOW?1:0)}));
+    Q(P.y+1,()=>drawFolk({x:P.x,y:P.y,a:P.a,coat:G.look.coat,coat2:G.look.coat2,skin:G.look.skin,hat:G.look.hat,hatc:G.look.hatc,walk:P.horse?0:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:heldW(P).weapon,hand:heldW(P).hand,flash:P.flash,lift:P.horse?(Math.sin(P.ha)>0.62?32:Math.sin(P.ha)<-0.62?28:22):0,sink:P.horse?0:(tileAt(P.x,P.y)===TL.DEEP?2:tileAt(P.x,P.y)===TL.SHALLOW?1:0)}));
     if(P.swing>0){const W=WEAP[G.melee],k=1-P.swing/P.swingMax;ctx.strokeStyle='rgba(255,255,255,'+(0.55*(1-k)).toFixed(3)+')';ctx.lineWidth=G.melee==='axe'?7:4;ctx.beginPath();ctx.arc(P.x,P.y,W.reach-14,P.a-W.arc*0.95,P.a-W.arc*0.95+W.arc*1.9*k+0.2);ctx.stroke();}
     if(wet){ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(P.x,P.y,12+Math.sin(T*5)*2,0,TAU);ctx.stroke();}
   }
   flushQ();
+  // top view: the canopy is drawn over people, horses and ships so you walk under it
+  for(let i=0;i<topTrees.length;i+=3){
+    const tx=topTrees[i],ty=topTrees[i+1],near=!P.ship&&!P.dead&&Math.abs(P.x-(tx+36))<46&&Math.abs(P.y-(ty+36))<46;
+    if(near){ctx.globalAlpha=0.55;ctx.drawImage(spr.tree[topTrees[i+2]],tx,ty);ctx.globalAlpha=1;}else ctx.drawImage(spr.tree[topTrees[i+2]],tx,ty);
+  }
   if(TKr<1&&!P.ship&&!P.dead&&G.state==='play'){
     let hid=false;
     for(const b of buildings){const bx0=b.x*TS,bx1=(b.x+b.w)*TS,by1=(b.y+b.h)*TS;if(P.x>bx0-8&&P.x<bx1+8&&P.y<by1&&P.y>b.y*TS-90/TKr){hid=true;break;}}
-    if(hid){ctx.save();ctx.globalAlpha=0.5;tFolk({x:P.x,y:P.y,a:P.a,coat:'#2b2630',coat2:'#b02a2a',skin:'#d9a878',hat:'bandana',walk:P.horse?0:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:P.aimT>0?G.gun:G.melee,flash:P.flash,lift:P.horse?(Math.sin(P.ha)>0.62?32:Math.sin(P.ha)<-0.62?28:22):0,sink:P.horse?0:(tileAt(P.x,P.y)===TL.DEEP?2:tileAt(P.x,P.y)===TL.SHALLOW?1:0)});ctx.restore();}
+    if(hid){ctx.save();ctx.globalAlpha=0.5;tFolk({x:P.x,y:P.y,a:P.a,coat:G.look.coat,coat2:G.look.coat2,skin:G.look.skin,hat:G.look.hat,hatc:G.look.hatc,walk:P.horse?0:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:heldW(P).weapon,hand:heldW(P).hand,flash:P.flash,lift:P.horse?(Math.sin(P.ha)>0.62?32:Math.sin(P.ha)<-0.62?28:22):0,sink:P.horse?0:(tileAt(P.x,P.y)===TL.DEEP?2:tileAt(P.x,P.y)===TL.SHALLOW?1:0)});ctx.restore();}
   }
   // boarding line
   if(G.board&&!P.dead){ctx.strokeStyle='#d8c08a';ctx.lineWidth=2.5;ctx.setLineDash([4,5]);ctx.beginPath();ctx.moveTo(P.x,P.y);ctx.lineTo(G.board.s.x,G.board.s.y);ctx.stroke();ctx.setLineDash([]);}
@@ -2175,7 +2603,7 @@ function render(){
   ctx.save();if(TKr<1)ctx.translate(0,-14/TKr);
   for(const b of bullets){ctx.strokeStyle=b.col||(b.own==='p'?'rgba(255,240,170,.9)':'rgba(255,200,120,.9)');ctx.lineWidth=b.knife?2.6:2;const tl=b.knife?0.018:0.025;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.vx*tl,b.y-b.vy*tl);ctx.stroke();}
   ctx.restore();
-  for(const b of bombs){ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(b.x+2,b.y+3,5,3,0,0,TAU);ctx.fill();ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(b.x,b.y,5,0,TAU);ctx.fill();ctx.fillStyle=(Math.floor(G.t*14)%2)?'#ffb347':'#ff5a2a';ctx.beginPath();ctx.arc(b.x+3,b.y-5,2.2,0,TAU);ctx.fill();}
+  drawBombs(bombs,TKr<1?7/TKr:0);
   for(const b of balls){const lf=TKr<1?11/TKr:0;if(lf){ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(b.x,b.y,4,2.4,0,0,TAU);ctx.fill();}ctx.fillStyle='#15151a';ctx.beginPath();ctx.arc(b.x,b.y-lf,4.2,0,TAU);ctx.fill();ctx.fillStyle='rgba(255,255,255,.4)';ctx.beginPath();ctx.arc(b.x-1,b.y-1-lf,1.3,0,TAU);ctx.fill();}
   drawParts(1);
   // day/night
@@ -2316,7 +2744,7 @@ function updateHUD(){
     setHTML(weaponEl,'w','<span><b>'+(s.name||st2.name)+'</b>'+kn+' kn</span>'+(st2.guns?'<span>Port<span class="gun"><i style="width:'+(l*100).toFixed(0)+'%"></i></span></span><span>Starboard<span class="gun"><i style="width:'+(r*100).toFixed(0)+'%"></i></span></span>':'<span>No cannons</span>')+spH+'<span><b>F</b>Leave</span>');
   }else{
     const gw=WEAP[G.gun];
-    setHTML(weaponEl,'w','<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span><span style="opacity:.7">Tab wheel &nbsp; <b>H</b>'+(G.steed&&G.steed.follow&&!G.steed.down?'steed: stay':'call steed')+(P.horse?' &nbsp; <b>Q</b>dismount &nbsp; <b>V</b>tonic &times;'+G.items.tonic:'')+'</span>');
+    setHTML(weaponEl,'w',hudW()+'<span style="opacity:.7">Tab wheel &nbsp; <b>H</b>'+(G.steed&&G.steed.follow&&!G.steed.down?'steed: stay':'call steed')+(P.horse?' &nbsp; <b>Q</b>dismount &nbsp; <b>V</b>tonic &times;'+G.items.tonic:'')+'</span>');
   }
   {
     const mh=P.horse;
@@ -2341,8 +2769,8 @@ function updateHUD(){
 const SHIP_PRICE={sloop:200,brig:520,galleon:600,flagship:1500,cutter:150,schooner:380,frigate:1000,manowar:2400,comet:5000};
 const REG_FEE={sloop:120,brig:260,galleon:320,flagship:700,cutter:90,schooner:200,frigate:480,manowar:1100,comet:0};
 const MODINFO={
-  bow:{n:'Bow chasers',c:350,d:'Level 2. Two forward cannons. They swivel to aim at your mouse in any direction and fire with your broadsides (left-click / Space).'},
-  all:{n:'360 swivel cannon',c:600,d:'Level 2. One heavy cannon that turns a full circle. Aim with the mouse and fire a single shot at a time (right-click).'},
+  bow:{n:'Bow chasers',c:350,d:'Level 2. Two forward cannons. They swivel only a few degrees toward your mouse and fire with your broadsides (left-click / Space).'},
+  all:{n:'360 swivel cannon',c:600,d:'Level 2. One heavy cannon at the bow that aims a full circle. Aim with the mouse and fire a single shot at a time (right-click).'},
   vol:{n:'360 volley',c:0,d:'Debug ship only. Twenty cannons in every direction at once.'},
   harp:{n:'Harpoon gun',c:450,d:'Level 2. Grapple an enemy ship, then fight across her deck to the captain and take her.'}
 };
@@ -2377,7 +2805,7 @@ function fleetItems(z,items){
   if(!cur)cur=myShip();
   items.push({t:'Back to the yard',d:'Repairs, upgrades and new ships.',c:0,lbl:'‹',ok:()=>true,run(){G.shopPage='main';}});
   if(cur){
-    if(!cur.own)items.push({t:'Refit the '+ST[cur.type].name+': no papers',d:'Level 2 fittings need papers in your name. File them at the Harbour Registry beside the shipyard first.',c:0,lbl:'—',ok:()=>false,run(){}});
+    if(!cur.own)items.push({t:'Refit the '+ST[cur.type].name+': no papers',d:'Level 2 fittings need papers in your name. Buy ship papers at the Harbour Registry, then sign for her at the captain\'s desk below deck.',c:0,lbl:'—',ok:()=>false,run(){}});
     else for(const k of MODORDER){
       const fit=!!cur.mods[k];
       items.push({t:MODINFO[k].n+(fit?' (fitted)':'')+' — '+nm(cur),d:MODINFO[k].d,c:fit?0:MODINFO[k].c,lbl:fit?'Fitted':undefined,ok:()=>!cur.mods[k]&&!cur.dead,run(){cur.mods[k]=1;cur.sel=Math.max(0,specials(cur).indexOf(k));toast(MODINFO[k].n+' fitted to the '+nm(cur)+'.','good');}});
@@ -2393,7 +2821,8 @@ function fleetItems(z,items){
       G.wrecks.splice(G.wrecks.indexOf(w),1);const sh=spawnDockShip(w.type,pier);sh.own=true;sh.name=w.name;sh.mods=Object.assign({bow:0,all:0,harp:0},w.mods);sh.hp=Math.max(1,sh.maxhp*0.5);toast('The '+w.name+' breaks the surface.','good');}});
   });
 }
-function bowAim(s){return s.crew==='player'?Math.atan2(mouse.wy-s.y,mouse.wx-s.x):s.a;}
+const BOW_SWIVEL=0.2;
+function bowAim(s){if(s.crew!=='player')return s.a;const r=Math.atan2(mouse.wy-s.y,mouse.wx-s.x);return s.a+clamp(angDiff(r,s.a),-BOW_SWIVEL,BOW_SWIVEL);}
 function fireBow(s){
   if(!s.mods||!s.mods.bow||s.scd.bow>0||G.deck||G.grap)return;
   const st=ST[s.type],up=1+0.3*G.upg.dmg,c=Math.cos(s.a),sn=Math.sin(s.a);
@@ -2414,8 +2843,7 @@ function fireSpecial(s){
   if(k==='all'){
     s.scd.all=SPEC_CD.all;
     const a=Math.atan2(mouse.wy-s.y,mouse.wx-s.x),ca=Math.cos(s.a),sa=Math.sin(s.a);
-    const t=a-s.a,lx=Math.cos(t)*st.L*0.42,ly=Math.sin(t)*st.W*0.45;
-    const x=s.x+ca*lx-sa*ly,y=s.y+sa*lx+ca*ly,sp=CANNON_SPEED*1.1;
+    const x=s.x+ca*st.L*0.5,y=s.y+sa*st.L*0.5,sp=CANNON_SPEED*1.1;
     const ang=a+rr(-0.012,0.012);
     balls.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:CANNON_RANGE*1.3/sp,dmg:Math.max(st.dmg,14)*1.8*up,own:s,fac:'pirate',byPlayer:true});
     smoke(x+Math.cos(a)*8,y+Math.sin(a)*8,3,8);addP(x+Math.cos(a)*6,y+Math.sin(a)*6,0,0,0.12,10,'rgba(255,210,110,.95)',{grow:22});
@@ -2623,15 +3051,16 @@ function deckMelee(D){
 }
 function deckFire(D){
   const P=player,W=WEAP[G.gun],ak=W.ammo,p=D.p;
+  if(G.gun==='nogun'){if(P.reload<=0){toast('No firearm equipped. Open the weapon wheel.','bad');P.reload=0.6;sfx('no');}return;}
   if((G.ammo[ak]||0)<=0){if(P.reload<=0){toast('Out of '+AMMO_NAME[ak]+'!','bad');P.reload=0.8;sfx('no');}return;}
   G.ammo[ak]--;P.reload=W.rel;P.aimT=1.3;
-  if(G.gun==='bomb'){
+  if(W.thr==='lob'){
     const d=clamp(Math.hypot(mouse.wx-p.x,mouse.wy-p.y),70,330),ox=Math.cos(D.pa),oy=Math.sin(D.pa);
-    D.bombs.push({x:p.x+ox*14,y:p.y+oy*14,vx:ox*d/0.75,vy:oy*d/0.75,fl:0.75,t:1.2});sfx('slash');return;
+    D.bombs.push({x:p.x+ox*14,y:p.y+oy*14,vx:ox*d/0.75,vy:oy*d/0.75,fl:0.75,t:W.kind==='bomb'?1.2:0.78,kind:W.kind});sfx('slash');return;
   }
   for(let i=0;i<W.pellets;i++){
     const a=D.pa+rr(-W.spread,W.spread);
-    D.bullets.push({x:p.x+Math.cos(a)*16,y:p.y+Math.sin(a)*16,vx:Math.cos(a)*W.speed,vy:Math.sin(a)*W.speed,life:W.life*rr(0.9,1.1),dmg:W.dmg,own:'p',col:W.col,knife:G.gun==='knives'});
+    D.bullets.push({x:p.x+Math.cos(a)*16,y:p.y+Math.sin(a)*16,vx:Math.cos(a)*W.speed,vy:Math.sin(a)*W.speed,life:W.life*rr(0.9,1.1),dmg:W.dmg,own:'p',col:W.col,knife:W.thr==='blade',kt:W.thr==='blade'?W.ammo:undefined});
   }
   if(!W.silent){smoke(p.x+Math.cos(D.pa)*22,p.y+Math.sin(D.pa)*22,3,6);addP(p.x+Math.cos(D.pa)*18,p.y+Math.sin(D.pa)*18,0,0,0.08,7,'rgba(255,230,140,.95)',{grow:12});D.noise=0.9;}
   sfx(W.sfx);G.shake=Math.max(G.shake,(W.shake||1.5)*0.7);
@@ -2700,12 +3129,11 @@ function updateDeck(dt){
   mouseWorld(D.cam.x,D.cam.y,D.cam.z,D.p.x,D.p.y,padRange());
   const p=D.p,up=keys.KeyW||keys.ArrowUp,dn=keys.KeyS||keys.ArrowDown,lf=keys.KeyA||keys.ArrowLeft,rt=keys.KeyD||keys.ArrowRight;
   let dx=(rt?1:0)-(lf?1:0),dy=(dn?1:0)-(up?1:0);let l=Math.hypot(dx,dy);if(l>0){dx/=l;dy/=l;}
-  if(pad.fm>0&&l===0){dx=pad.fx*pad.fm;dy=pad.fy*pad.fm;l=pad.fm;}
+  if(pad.fm>0&&l===0){dx=pad.fx*pad.fm;dy=pad.fy*pad.fm;l=pad.fm;}if(isDrunk()&&!player.horse){dx=-dx;dy=-dy;}
   const spd=112*((keys.ShiftLeft||keys.ShiftRight)?1.4:1);
   if(l>0){P.walk+=dt*spd/55;deckMove(D,p,dx*spd*dt,dy*spd*dt,7);}
   D.pa=Math.atan2(mouse.wy-p.y,mouse.wx-p.x);
-  if((mouse.down||keys.Space)&&P.cool<=0)deckSwing(D);
-  if((mouse.rdown||keys.KeyF)&&P.reload<=0)deckFire(D);
+  handUse(0,D,mouse.down||keys.Space);handUse(1,D,mouse.rdown||keys.KeyF);
   if(D.hitIn>0){D.hitIn-=dt;if(D.hitIn<=0)deckMelee(D);}
   // cabin door
   if(!D.doorOpen&&Math.hypot(p.x-D.door.x,p.y-D.door.y)<48){
@@ -2750,10 +3178,11 @@ function updateDeck(dt){
   for(const b of D.bombs){
     b.t-=dt;
     if(b.fl>0){b.fl-=dt;const nx=b.x+b.vx*dt,ny=b.y+b.vy*dt;if(!deckIn(D,nx,ny)||deckHit(D,nx,ny,3)){b.vx*=-0.2;b.vy*=-0.2;b.fl=0;}else{b.x=nx;b.y=ny;}}
-    if(Math.random()<0.7)addP(b.x+3,b.y-5,rr(-12,12),rr(-12,12),0.25,2,'rgba(255,170,60,.9)');
-    if(b.t<=0){b.dead=true;deckBlast(D,b.x,b.y);if(G.deck!==D)return;}
+    if(Math.random()<0.7)addP(b.x+3,b.y-5,rr(-12,12),rr(-12,12),0.25,2,b.kind==='rum'?'rgba(150,230,170,.8)':'rgba(255,170,60,.9)');
+    if(b.t<=0){b.dead=true;bombEnd(b,D);if(G.deck!==D)return;}
   }
   compact(D.bombs,b=>!b.dead);
+  fireStep(D.fires||(D.fires=[]),dt,D);
   updateParts(dt);
   // retreat at the bow rail
   if(p.x<3.6*TS){
@@ -2773,7 +3202,7 @@ function deckHUD(){
   const P=player,gw=WEAP[G.gun];
   hullRow.style.display='none';
   setTxt(goldTxt,'gold',String(G.gold));
-  setHTML(weaponEl,'w','<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span><span style="opacity:.7">Tab wheel &nbsp; hold <b>E</b> at the bow rail: leave</span>');
+  setHTML(weaponEl,'w',hudW()+'<span style="opacity:.7">Tab wheel &nbsp; hold <b>E</b> at the bow rail: leave</span>');
   if(hc.pr!==''){hc.pr='';promptEl.innerHTML='';promptEl.classList.add('hidden');}
   steedHudEl.classList.add('hidden');
   hurtEl.style.opacity=Math.max(G.hurtFlash,P.hp<30?0.25+0.2*Math.sin(G.t*6):0).toFixed(2);
@@ -2790,7 +3219,7 @@ function renderDeck(){
   ctx.fillStyle='#0b4070';ctx.fillRect(0,0,VW,VH);
   ctx.fillStyle='rgba(233,246,255,.12)';
   for(let i=0;i<40;i++){const x=((i*211+T*18*(1+(i%3)))%(VW+80))-40,y=(i*97)%VH;ctx.fillRect(x,y,26+(i%4)*8,2);}
-  const sh=G.shake,ox=sh?rr(-sh,sh):0,oy=sh?rr(-sh,sh):0;
+  const sh=G.shake*OPT.shake,ox=sh?rr(-sh,sh):0,oy=sh?rr(-sh,sh):0;
   ctx.setTransform(DPR*z,0,0,DPR*z*tk,DPR*(VW/2-c.x*z+ox),DPR*(VH/2-c.y*z*tk+oy));
   const pal=PAL[D.fac]||PAL.merchant,outer=deckPoly(D,0.7),inner=deckPoly(D,0.45);
   if(tk<1){ctx.save();ctx.translate(0,16/tk);pathPoly(outer);ctx.fillStyle=tShade(pal.hull,-.4);ctx.fill();ctx.restore();}
@@ -2838,6 +3267,7 @@ function renderDeck(){
     if(k.type==='rum'){ctx.fillStyle='rgba(255,120,90,'+(0.18+0.12*pu)+')';ctx.beginPath();ctx.arc(k.x,k.y,16,0,TAU);ctx.fill();ctx.fillStyle='#8a2f2f';ctx.beginPath();ctx.arc(k.x,k.y,7,0,TAU);ctx.fill();ctx.fillStyle='#c9a24a';ctx.fillRect(k.x-2,k.y-11,4,5);}
     else{ctx.fillStyle='rgba(255,215,90,'+(0.25+0.2*pu)+')';ctx.beginPath();ctx.arc(k.x,k.y,18,0,TAU);ctx.fill();ctx.strokeStyle='#ffd75a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(k.x-5,k.y,4.5,0,TAU);ctx.moveTo(k.x-0.5,k.y);ctx.lineTo(k.x+10,k.y);ctx.moveTo(k.x+7,k.y);ctx.lineTo(k.x+7,k.y+4);ctx.stroke();}
   }
+  drawFires(D.fires);
   // yards over the masts (decor)
   ctx.strokeStyle='rgba(74,50,32,.9)';ctx.lineWidth=6;ctx.lineCap='round';
   if(tk>=1)for(const s of D.solids)if(s.k==='mast'){ctx.beginPath();ctx.moveTo(s.x+s.w/2,s.y+s.h/2-1.7*TS);ctx.lineTo(s.x+s.w/2,s.y+s.h/2+1.7*TS);ctx.stroke();}
@@ -2855,9 +3285,9 @@ function renderDeck(){
     });
   }
   const p=D.p;
-  Q(p.y+1,()=>drawFolk({x:p.x,y:p.y,a:D.pa,coat:'#2b2630',coat2:'#b02a2a',skin:'#d9a878',hat:'bandana',walk:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:P.aimT>0?G.gun:G.melee,flash:P.flash}));
+  Q(p.y+1,()=>drawFolk({x:p.x,y:p.y,a:D.pa,coat:G.look.coat,coat2:G.look.coat2,skin:G.look.skin,hat:G.look.hat,hatc:G.look.hatc,walk:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:heldW(P).weapon,hand:heldW(P).hand,flash:P.flash}));
   flushQ();
-  if(tk<1&&deckHidden(D,p.x,p.y)){ctx.save();ctx.globalAlpha=0.5;tFolk({x:p.x,y:p.y,a:D.pa,coat:'#2b2630',coat2:'#b02a2a',skin:'#d9a878',hat:'bandana',walk:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:P.aimT>0?G.gun:G.melee,flash:P.flash});ctx.restore();}
+  if(tk<1&&deckHidden(D,p.x,p.y)){ctx.save();ctx.globalAlpha=0.5;tFolk({x:p.x,y:p.y,a:D.pa,coat:G.look.coat,coat2:G.look.coat2,skin:G.look.skin,hat:G.look.hat,hatc:G.look.hatc,walk:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:heldW(P).weapon,hand:heldW(P).hand,flash:P.flash});ctx.restore();}
   if(P.swing>0){const W=WEAP[G.melee],k=1-P.swing/P.swingMax;ctx.strokeStyle='rgba(255,255,255,'+(0.55*(1-k)).toFixed(3)+')';ctx.lineWidth=G.melee==='axe'?7:4;ctx.beginPath();ctx.arc(p.x,p.y,W.reach-14,D.pa-W.arc*0.95,D.pa-W.arc*0.95+W.arc*1.9*k+0.2);ctx.stroke();}
   if(!P.dead&&!G.bigmap){
     const ax=D.p.x,ay=D.p.y,d=Math.hypot(mouse.wx-ax,mouse.wy-ay);
@@ -2874,7 +3304,7 @@ function renderDeck(){
   for(const b of D.bullets){ctx.strokeStyle=b.col||(b.own==='p'?'rgba(255,240,170,.9)':'rgba(255,200,120,.9)');ctx.lineWidth=b.knife?2.6:2;const tl=b.knife?0.018:0.025;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.vx*tl,b.y-b.vy*tl);ctx.stroke();}
   ctx.restore();
   if(D.knives)for(const k of D.knives)drawKnife(k);
-  for(const b of D.bombs){const lf=tk<1?7/tk:0;if(tk<1){ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(b.x+2,b.y+3,5,3,0,0,TAU);ctx.fill();}ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(b.x,b.y-lf,5,0,TAU);ctx.fill();ctx.fillStyle=(Math.floor(G.t*14)%2)?'#ffb347':'#ff5a2a';ctx.beginPath();ctx.arc(b.x+3,b.y-5-lf,2.2,0,TAU);ctx.fill();}
+  drawBombs(D.bombs,tk<1?7/tk:0);
   drawParts(1);
   // screen space overlay
   ctx.setTransform(DPR,0,0,DPR,0,0);
@@ -2900,25 +3330,29 @@ function drawShipTag(s){
 
 /* ================= input ================= */
 function onKey(c){
-  if(G.state==='title'){if(G.ready&&(c==='Enter'||c==='Space'))startGame(G.hasSave);return;}
+  if(UI.page){if(c==='Escape'||c==='Backspace')closePage();return;}
+  if(G.state==='title'){if(!G.ready)return;if(!UI.menu){if(c==='Enter'||c==='Space'||c==='Escape')showMainMenu();return;}if(c==='Enter'||c==='Space'){const ae=document.activeElement;if(!ae||ae===document.body)startGame(G.hasSave);}return;}
   if(G.dbg){if(c==='Escape')debugBack();return;}
   if(c==='Escape'){
-    if(G.shop){closeShop();return;}
+    if(G.stashOpen){closeStash();return;}
+    if(G.shop){if(G.shopCat!=null&&G.shopPage==='main'){G.shopCat=null;renderShop();return;}closeShop();return;}
     if(G.bigmap){toggleMap();return;}
     if(WHEEL.open){WHEEL.close();return;}
     setPaused(!G.paused);return;
   }
-  if(G.paused)return;
+  if(c==='KeyI'&&!G.paused&&!G.shop&&!G.dlg&&!player.dead&&G.state==='play'){if(invVisible())closeStash();else if(!G.stashOpen&&!WHEEL.open)openInv();return;}
+  if(G.paused||G.stashOpen)return;
   if(WHEEL.open)return;
   if(c==='KeyM'){toggleMap();return;}
   if(c==='KeyN'){G.mute=!G.mute;applyMaster();toast(G.mute?'Sound off':'Sound on');return;}
   if(G.shop){
     if(c==='KeyE')closeShop();
-    else if(c.startsWith('Digit'))buy(parseInt(c.slice(5),10)-1);
+    else if(c.startsWith('Digit')){const n=parseInt(c.slice(5),10),bs=[...shopEl.querySelectorAll('.item')].filter(x=>!x.dataset.back);if(bs[n-1])shopPick(bs[n-1]);}
     return;
   }
   if(player.dead)return;
   if(G.dlg){dlgKey(c);return;}
+  if(c==='KeyG'&&!(G.deck&&(G.deck.scene==='prison'||G.deck.scene==='int'))){swapHands();return;}
   if(G.deck){deckKey(c);return;}
   if(c==='KeyQ'&&player.horse){dismount();return;}
   if(c==='KeyH'){whistle();return;}
@@ -3084,7 +3518,42 @@ function debugTick(dt){
 $('resume').addEventListener('click',()=>{setPaused(false);$('resume').blur();});
 
 /* ================= save / load ================= */
-const BB_V={main:39,tester:39},BB_DATE='Oct 11, 2026';
+const CHANGELOG=[
+{v:48,d:'Oct 13, 2026',n:['Corral fences now block you on foot as well as horses (go in through the gate).']},
+{v:47,d:'Oct 13, 2026',n:[
+'Tortuga and Bonny\'s Rest both fight back after you kill 3 of their people. The fight lasts 45 seconds with a timer on screen.',
+'During a fight, waves of pirates pour out of the tavern door every 10 seconds. Hold out and you earn gold for every wave.',
+'The fight ends quickly: when the timer runs out, or if you leave town. Hitting people no longer provokes the town, only kills do.',
+'Killed townsfolk now slowly return, calm, while you are away.',
+'The Navy is a bit harder to shake: heat cools slower and starts cooling later.']},
+{v:46,d:'Oct 13, 2026',n:['Tortuga fights back: attack enough of its pirates and the rest draw swords or pistols for a while. Other towns are unchanged.']},
+{v:45,d:'Oct 13, 2026',n:['The clean-up sweep runs on its own only (no on-demand button).']},
+{v:44,d:'Oct 13, 2026',n:[
+'Clean-up sweep: stuck townsfolk are sent home and idle ships you left behind are cleared after a minute out of sight. The last ship you used is never removed, nor are owned ships.',
+'Far fewer wild horses on the islands and in towns.',
+'Fenced corrals with cows, pigs, goats and sheep beside each stable.']},
+{v:43,d:'Oct 13, 2026',n:[
+'Top view: you now walk under the tree canopy (it fades a little when you are beneath it).',
+'View names are now Top and 3/4 angled.']},
+{v:42,d:'Oct 13, 2026',n:[
+'Interiors for the tavern, armory, stable, governor, castle throne room, shipyard and Harbour Registry, with beds, meals, a weapon chest and a wardrobe where they belong.',
+'Ship interior: captain\'s quarters with a bed, wardrobe and captain\'s desk, plus a stash and a rum barrel.',
+'Papers: buy ship papers at the Harbour Registry, then claim a ship at the captain\'s desk (needs a free fleet slot, up to 3 ships).',
+'New weapon system: two hands. Attack uses the left hand and alt attack the right. Swap hands from G or the wheel.',
+'Thrown weapons: grenados, Molotov cocktails (rum bottles), throwing knives (max 20) and hatchets. Out of ammo you punch, or swing your last knife or hatchet.',
+'Weapon wheel with sub-menus for weapons, items, crew and steed.',
+'Inventory on the I key: papers, horse tonic and rum. Rum heals a little, but too much makes you drunk (reversed controls, a sluggish horse, a wobbling sail).',
+'Custom wardrobe: coat, trim, skin and hat, saved with your game.',
+'Ships now answer your call near the shore or the nearest dock on your island.',
+'Bow chaser cannons only swivel a few degrees, and the swivel cannon fires from the same spot at the bow.',
+'New main menu: Press Start, Continue or New Game, Controls and Options.',
+'Controls page with Xbox and PlayStation button icons beside the keyboard keys.',
+'Options page: music and effects volume, screen shake, touch controls, camera view, fullscreen and this change log.',
+'Tidier pause menu, and shop menus split into categories.']},
+{v:39,d:'Earlier',n:[
+'Cloud saves with email sign-in, installable app (PWA), controller and touch support, music and sound volumes.']}
+];
+const BB_V={main:48,tester:48},BB_DATE='Oct 13, 2026';
 const SAVE_KEY='blackwaterbay.save.v1';
 let saveIndT=0;
 function saveInd(msg){const el=$('saveInd');el.textContent=msg;el.classList.add('show');clearTimeout(saveIndT);saveIndT=setTimeout(()=>el.classList.remove('show'),1700);}
@@ -3093,7 +3562,7 @@ function writeSave(manual){
   if(G.state!=='play'||player.dead)return false;
   try{
     const P=player;
-    const data={v:1,t:Date.now(),gold:G.gold,hp:P.hp,maxhp:P.maxhp,x:P.x,y:P.y,tod:G.tod,done:G.done,upg:G.upg,ammo:G.ammo,owned:G.owned,melee:G.melee,gun:G.gun,kills:G.kills,won:G.won,story:G.story,
+    const data={v:1,t:Date.now(),gold:G.gold,hp:P.hp,maxhp:P.maxhp,x:P.x,y:P.y,tod:G.tod,done:G.done,upg:G.upg,ammo:G.ammo,owned:G.owned,melee:G.melee,gun:G.gun,carry:G.carry,look:G.look,kills:G.kills,won:G.won,story:G.story,
       mission:mission?mission.idx:null,chests:G.chestsTaken,onShip:-1,ships:[],steed:G.steed?Object.assign(recOf(G.steed),{x:G.steed.x,y:G.steed.y,follow:!!G.steed.follow}):null,stable:G.stable,items:G.items,wrecks:G.wrecks,fleet:1};
     for(const sh of ships){if(sh.dead||sh.fac!=='pirate')continue;if(sh===P.ship)data.onShip=data.ships.length;data.ships.push({type:sh.type,x:sh.x,y:sh.y,a:sh.a,hp:sh.hp,maxhp:sh.maxhp,own:!!sh.own,name:sh.name||'',mods:sh.mods,conq:!!sh.conq});}
     localStorage.setItem(SAVE_KEY,JSON.stringify(data));
@@ -3106,9 +3575,23 @@ function applySave(d){
   if(P.horse&&P.horse.dbg)P.horse=null;compact(horses,q=>!q.dbg);
   G.gold=d.gold|0;G.done=d.done|0;G.kills=d.kills|0;G.won=!!d.won;
   G.upg=Object.assign({hull:0,dmg:0,speed:0},d.upg);
-  G.ammo=Object.assign({shot:12,grape:0,bombs:0,knives:0},d.ammo);
+  G.ammo=Object.assign({shot:12,grape:0,bombs:0,knives:0,rums:0,molos:0,hatchets:0},d.ammo);
+  for(const k of ['shot','grape','bombs','knives','molos','hatchets'])if(G.ammo[k]>AMMO_MAX[k])G.ammo[k]=AMMO_MAX[k];
   G.owned=Object.assign({cutlass:1,pistol:1},d.owned);
-  G.melee=WEAP[d.melee]&&G.owned[d.melee]?d.melee:'cutlass';G.gun=WEAP[d.gun]&&G.owned[d.gun]?d.gun:'pistol';
+  if(d.owned&&d.owned.rum){G.owned.molo=1;G.owned.rum=0;}
+  if(d.ammo&&d.ammo.rums){G.ammo.molos=Math.min(AMMO_MAX.molos,(G.ammo.molos|0)+(d.ammo.rums|0));G.ammo.rums=0;}
+  if(d.carry)d.carry=d.carry.map(k=>k==='rum'?'molo':k);
+  if(d.thrown==='rum')d.thrown='molo';if(d.gun==='rum')d.gun='molo';
+  G.thrown=null;G.look=Object.assign({},LOOK_DEF,d.look||{});
+  if(Array.isArray(d.carry)){G.carry=d.carry.slice(0,2);if(d.thrown&&G.owned[d.thrown]&&G.carry.length<2&&!G.carry.includes(d.thrown))G.carry.push(d.thrown);}
+  else{ // older saves: melee + one gun, a thrown pick becomes the thrown slot
+    G.carry=[];
+    if(WEAP[d.melee]&&WEAP[d.melee].cat==='melee'&&G.owned[d.melee])G.carry.push(d.melee);
+    if(WEAP[d.gun]&&WEAP[d.gun].cat!=='melee'&&!WEAP[d.gun].hidden&&G.owned[d.gun])G.carry.push(d.gun);
+    else if(G.owned.pistol)G.carry.push('pistol');
+    if(!G.carry.length)G.carry=['cutlass','pistol'];
+  }
+  G.melee=d.melee;G.gun=d.gun;syncCarry();
   if(typeof d.tod==='number')G.tod=d.tod;
   G.chestsTaken=Array.isArray(d.chests)?d.chests.slice():[];
   const taken=new Set(G.chestsTaken);compact(pickups,k=>!(k.type==='chest'&&k.id!==undefined&&taken.has(k.id)));
@@ -3129,7 +3612,7 @@ function applySave(d){
   if(cur){P.ship=cur;cur.crew='player';P.x=cur.x;P.y=cur.y;}
   G.heat=0;G.lastSeen=null;G.deck=null;G.grap=null;harps.length=0;
   G.wrecks=Array.isArray(d.wrecks)?d.wrecks.filter(w=>w&&ST[w.type]).slice(0,3):[];
-  G.items=Object.assign({tonic:1,feed:0},d.items);
+  G.items=Object.assign({tonic:1,feed:0,rum:0,papers:0},d.items);
   G.stable=Array.isArray(d.stable)?d.stable.filter(r=>r&&BREEDS[r.breed]).slice(0,3):[];
   if(d.steed&&G.steed){
     const h=G.steed;applyRec(h,d.steed);h.follow=!!d.steed.follow;
@@ -3163,6 +3646,181 @@ function startGame(cont){
   }
   sfx('ui');
 }
+/* ---- title screen: press start, main menu, controls page, options page ---- */
+const OPT={shake:1};
+try{const o=JSON.parse(localStorage.getItem('blackwaterbay.opt')||'null');if(o&&typeof o.shake==='number')OPT.shake=o.shake;}catch(e){}
+function saveOpt(){try{localStorage.setItem('blackwaterbay.opt',JSON.stringify(OPT));}catch(e){}}
+const UI={page:null,menu:false};
+function openPage(el){if(UI.page&&UI.page!==el)UI.page.classList.add('hidden');UI.page=el;el.classList.remove('hidden');pad.menuRoot=null;pad.mi=0;if(el.__sync)el.__sync();}
+function closePage(){if(!UI.page)return;UI.page.classList.add('hidden');UI.page=null;pad.menuRoot=null;pad.mi=0;sfx('ui');}
+function showMainMenu(){
+  if(UI.menu||!G.ready)return;UI.menu=true;
+  $('pressStart').classList.add('hidden');$('mainMenu').classList.remove('hidden');pad.menuRoot=null;pad.mi=0;
+  try{audioInit();if(AC&&AC.state==='suspended')AC.resume();sfx('ui');}catch(e){}
+}
+(function(){
+  try{
+    const stage=document.getElementById('stage'),tt=$('title');if(!tt)return;
+    const css=document.createElement('style');
+    css.textContent=`
+#pause .parch{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(440px,100%)}
+#pause .parch>*{grid-column:1/-1;margin:0!important}
+#pause .parch>h2{text-align:center}
+#pause .parch>#saveBtn,#pause .parch>#cloudBtn,#pause .parch>#pCtrl,#pause .parch>#pOpt{grid-column:auto;width:100%;border:2px solid #6b4a2b}
+#pause .parch>#menuBtn{border:2px solid #6b4a2b;margin-top:6px!important}
+#pause .parch>#touchBtn,#pause .parch>#viewBtn,#pause .parch>#soundBtn,#pause .parch>#crewBtn{display:none!important}
+#pause .parch>.hint,#pause .parch>#verPause{text-align:center;color:#5a4426!important}
+#pressStart{font-family:var(--font-display);font-size:clamp(28px,4vw,46px);letter-spacing:.14em;color:var(--parch);text-shadow:0 3px 0 #4a2f10,0 0 24px rgba(0,0,0,.8);cursor:pointer;padding:14px 30px;animation:psPulse 1.6s ease-in-out infinite}
+@keyframes psPulse{0%,100%{opacity:1}50%{opacity:.35}}
+#pressStart.wait{animation:none;opacity:.6;cursor:wait}
+#mainMenu{text-align:center;display:flex;flex-direction:column;gap:12px;width:min(380px,100%)}
+#mainMenu h2{margin-bottom:0}
+#mainMenu .btn{width:100%}
+#mainMenu .btn.ghost{border:2px solid #6b4a2b}
+#mainMenu #saveInfo{margin:0;font-size:13px;color:#5a4426}
+.pgOv{z-index:30;justify-content:flex-start;flex-direction:column;align-items:center;overflow-y:auto}
+.pgOv>.parch{margin:auto;width:min(900px,100%);text-align:left}
+.pgOv h2{text-align:center}
+.pgOv .btn.back{display:block;margin:14px auto 0}
+.cgrid{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(110px,1fr) minmax(90px,.8fr) minmax(90px,.8fr);gap:6px 14px;align-items:center;font-size:15px}
+.cgrid .hd{font:700 12px Georgia,serif;letter-spacing:.12em;text-transform:uppercase;color:#6b4a2b;border-bottom:2px solid #8a6a2c;padding-bottom:3px}
+.cgrid .sec{grid-column:1/-1;font:700 12px Georgia,serif;letter-spacing:.12em;text-transform:uppercase;color:#8a5a22;border-bottom:1px solid rgba(107,74,43,.4);padding-bottom:2px;margin-top:8px}
+.cgrid .k{font-weight:700}
+.cgrid .kbd{margin:1px 2px;font-size:14px;min-width:20px;padding:0 6px}
+.gp{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.gp svg{width:24px;height:24px;flex:none;vertical-align:middle}
+.gnote{font-size:13px;color:#5a4426;margin:10px 0 0;font-style:normal;line-height:1.45}
+.optRow{margin-top:12px}
+.optRow .lb{display:flex;justify-content:space-between;font-weight:700}
+.optRow .ctl{display:flex;gap:8px;align-items:center;margin-top:4px}
+.optRow .ctl .btn{width:46px;padding:6px 0;flex:none}
+.optBtn{display:block;width:100%;margin-top:12px}
+@media (max-width:640px){.cgrid{grid-template-columns:1.2fr 1fr;font-size:14px}.cgrid .hd:nth-child(n+3),.cgrid .c3,.cgrid .c4{display:none}.gMob{display:block!important}}
+.gMob{display:none}
+`;
+    document.head.appendChild(css);
+    // rebuild the title content, keeping the original buttons
+    const startBtn=$('startBtn'),contBtn=$('contBtn'),delBtn=$('delBtn'),saveInfo=$('saveInfo');
+    const padStatOld=$('padStat');
+    for(const sel of ['.ctrl','#padHelp','.row2']){const e=tt.querySelector(sel);if(e)e.remove();}
+    for(const e of [...tt.querySelectorAll('.hint')]){if(e!==saveInfo&&e.id!=='verTag')e.remove();}
+    const ps=document.createElement('div');ps.id='pressStart';ps.className='wait';ps.textContent='Charting the seas...';
+    const mm=document.createElement('div');mm.id='mainMenu';mm.className='parch hidden';
+    const h=document.createElement('h2');h.textContent='Main Menu';mm.appendChild(h);
+    mm.appendChild(saveInfo);
+    const mk=(id,txt,cls)=>{const b=document.createElement('button');b.id=id;b.className='btn'+(cls?' '+cls:'');b.textContent=txt;return b;};
+    mm.appendChild(contBtn);mm.appendChild(startBtn);
+    const ctrlBtn=mk('ctrlBtn','Controls'),optBtn=mk('optBtn','Options');
+    mm.appendChild(ctrlBtn);mm.appendChild(optBtn);
+    delBtn.classList.add('ghost');mm.appendChild(delBtn);
+    const foot=document.createElement('div');foot.className='hint';foot.style.marginTop='14px';foot.textContent='Keyboard and mouse, controller or touch. Sound on for cannon fire.';
+    tt.appendChild(ps);tt.appendChild(mm);tt.appendChild(foot);
+    ps.addEventListener('click',()=>{if(G.ready)showMainMenu();});
+    // ---- controls page ----
+    const gl=(inner)=>`<svg viewBox="0 0 24 24">${inner}</svg>`;
+    const xb=(l,c)=>`<span class="gp">${gl(`<circle cx="12" cy="12" r="11" fill="${c}" stroke="#222" stroke-width="1.5"/><text x="12" y="17" text-anchor="middle" font-size="14" font-weight="700" font-family="Arial" fill="#fff">${l}</text>`)}</span>`;
+    const psb={x:['#2f6fd0','M7 7l10 10M17 7L7 17'],o:['#d0433a',null],s:['#c25a9a','M7 7h10v10H7z'],t:['#2faa6a','M12 6l6 11H6z']};
+    const pp=(k)=>{const [c,p]=psb[k];const sh=k==='o'?'<circle cx="12" cy="12" r="5.5" fill="none" stroke="#fff" stroke-width="2"/>':`<path d="${p}" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;return `<span class="gp">${gl(`<circle cx="12" cy="12" r="11" fill="#1d1d28" stroke="${c}" stroke-width="2"/>${sh.replace(/#fff/g,c)}`)}</span>`;};
+    const pill=(t,w)=>`<span class="gp">${`<svg viewBox="0 0 ${w} 24" style="width:${w}px"><rect x="1" y="3" width="${w-2}" height="18" rx="9" fill="#2a2a34" stroke="#888" stroke-width="1.5"/><text x="${w/2}" y="17" text-anchor="middle" font-size="12" font-weight="700" font-family="Arial" fill="#fff">${t}</text></svg>`}</span>`;
+    const stick=(t,dir)=>`<span class="gp">${gl(`<circle cx="12" cy="12" r="10.5" fill="#2a2a34" stroke="#888" stroke-width="1.5"/><circle cx="12" cy="12" r="5" fill="#555" stroke="#bbb"/>`+(dir||''))}${t}</span>`;
+    const dpad=(t)=>`<span class="gp">${gl(`<path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z" fill="#2a2a34" stroke="#888" stroke-width="1.5" stroke-linejoin="round"/>`)}${t||''}</span>`;
+    const kb=(...a)=>a.map(x=>`<span class="kbd">${x}</span>`).join('');
+    const rows=[
+      ['On foot and horse'],
+      ['Move',kb('W','A','S','D'),stick('L'),''],
+      ['Sprint, gallop',kb('Shift'),stick('L3 click'),''],
+      ['Aim','Mouse',stick('R'),''],
+      ['Board, talk, enter, dig',kb('E'),xb('A','#2faa4a'),pp('x')],
+      ['Dismount, leave ship',kb('Q')+' / '+kb('F'),xb('B','#d0433a'),pp('o')],
+      ['Call steed (again to stay)',kb('H'),xb('X','#2f6fd0'),pp('s')],
+      ['Tonic (horse)',kb('V'),xb('Y','#e0b020'),pp('t')],
+      ['Combat'],
+      ['Left hand (attack)',kb('Click')+' '+kb('Space'),pill('RT',34),pill('R2',34)],
+      ['Right hand (alt attack)',kb('Right-click')+' '+kb('F'),pill('LT',34),pill('L2',34)],
+      ['Swap hands',kb('G'),pill('RB',34),pill('R1',34)],
+      ['Weapon wheel (weapons, items, crew, steed)','Hold '+kb('Tab')+' or middle mouse','Hold '+pill('LB',34)+', pick with a stick','Hold '+pill('L1',34)],
+      ['Items'],
+      ['Inventory',kb('I'),'From the wheel','From the wheel'],
+      ['Rum, ship papers','Inventory or wheel','Wheel','Wheel'],
+      ['At sea'],
+      ['Sail and steer',kb('W')+' raise '+kb('S')+' lower '+kb('A')+kb('D')+' turn',stick('Up, down, left, right'),''],
+      ['Broadside (aim up to 45&deg;)',kb('Click')+' '+kb('Space'),pill('RT',34),pill('R2',34)],
+      ['Swivel cannon, harpoon',kb('Right-click'),pill('LT',34),pill('L2',34)],
+      ['Switch special',kb('R'),'Wheel','Wheel'],
+      ['Hijack a ship','Hold '+kb('E')+' alongside','Hold '+xb('A','#2faa4a'),'Hold '+pp('x')],
+      ['Below deck: bunk, desk, stash','Wheel, Below deck','Wheel','Wheel'],
+      ['World'],
+      ['Map',kb('M'),pill('View',44),pill('Share',46)],
+      ['Pause',kb('Esc'),pill('Menu',44),pill('Options',56)],
+      ['Zoom','Mouse wheel',dpad('Up, down'),''],
+      ['Mute',kb('N'),'','']
+    ];
+    const cp=document.createElement('div');cp.id='ctrlPage';cp.className='overlay pgOv hidden';
+    let html='<div class="parch"><h2>Controls</h2><div class="cgrid"><div class="hd">Action</div><div class="hd">Keyboard and mouse</div><div class="hd c3">Xbox</div><div class="hd c4">PlayStation</div>';
+    for(const r of rows){
+      if(r.length===1){html+=`<div class="sec">${r[0]}</div>`;continue;}
+      const same=!r[3]&&r[2]&&!/^<span class="gp">(<svg)/.test(r[2])&&false;
+      html+=`<div class="k">${r[0]}</div><div>${r[1]}</div><div class="c3">${r[2]}</div><div class="c4">${r[3]||(r[2]&&/stick|dpad|svg/.test(r[2])&&!/RT|LT|RB|LB|View|Menu/.test(r[2])?r[2]:'')}</div>`;
+    }
+    html+='</div><p class="gnote"><b>Touch:</b> left thumb moves, right thumb aims and fires, buttons for the rest. They hide when a keyboard, mouse or controller is used.<br><b>Menus:</b> d-pad or stick to pick, '+xb('A','#2faa4a')+' / '+pp('x')+' to select, '+xb('B','#d0433a')+' / '+pp('o')+' to go back.<br><span id="padStat">Press any button on your controller to connect it.</span></p>';
+    html+='<button class="btn back">Back</button></div>';
+    cp.innerHTML=html;stage.appendChild(cp);
+    cp.querySelector('.back').addEventListener('click',e=>{e.target.blur();closePage();});
+    ctrlBtn.addEventListener('click',()=>{ctrlBtn.blur();openPage(cp);});
+    // ---- options page ----
+    const op=document.createElement('div');op.id='optPage';op.className='overlay pgOv hidden';
+    const oh=document.createElement('div');oh.className='parch';oh.style.width='min(480px,100%)';op.appendChild(oh);
+    oh.innerHTML='<h2>Options</h2>';
+    const syncs=[];
+    for(const [label,k] of [['Music','m'],['Sound effects','s']]){
+      const row=document.createElement('div');row.className='optRow';
+      row.innerHTML=`<div class="lb"><span>${label}</span><span class="pc"></span></div><div class="ctl"><button class="btn ghost mn">&minus;</button><input type="range" min="0" max="100" step="5" style="flex:1;min-width:0;accent-color:#8a5a22"><button class="btn ghost pl">+</button></div>`;
+      const r=row.querySelector('input'),pc=row.querySelector('.pc');
+      const set=v=>{VOL[k]=Math.max(0,Math.min(1,v));r.value=Math.round(VOL[k]*100);pc.textContent=Math.round(VOL[k]*100)+'%';applyMaster();saveVol();if(k==='s'){try{audioInit();sfx('coin');}catch(e){}}};
+      r.addEventListener('input',()=>set(r.value/100));
+      row.querySelector('.mn').addEventListener('click',e=>{e.target.blur();set(Math.round((VOL[k]-0.05)*20)/20);});
+      row.querySelector('.pl').addEventListener('click',e=>{e.target.blur();set(Math.round((VOL[k]+0.05)*20)/20);});
+      syncs.push(()=>{r.value=Math.round(VOL[k]*100);pc.textContent=Math.round(VOL[k]*100)+'%';});
+      oh.appendChild(row);
+    }
+    const shB=document.createElement('button');shB.className='btn ghost optBtn';oh.appendChild(shB);
+    const SH=[[1,'Full'],[0.4,'Reduced'],[0,'Off']];
+    const shSync=()=>{const c=SH.find(x=>x[0]===OPT.shake)||SH[0];shB.textContent='Screen shake: '+c[1];};
+    shB.addEventListener('click',()=>{shB.blur();const i=SH.findIndex(x=>x[0]===OPT.shake);OPT.shake=SH[(i+1)%SH.length][0];saveOpt();shSync();});
+    syncs.push(shSync);
+    const tcB=document.createElement('button');tcB.className='btn ghost optBtn';oh.appendChild(tcB);
+    const tcSync=()=>{tcB.textContent='Touch controls: '+({auto:'Auto',on:'Always on',off:'Off'})[G.touchMode||'auto'];};
+    tcB.addEventListener('click',()=>{tcB.blur();$('touchBtn').click();tcSync();});
+    syncs.push(tcSync);
+    const vwB=document.createElement('button');vwB.className='btn ghost optBtn';oh.appendChild(vwB);
+    const vwSync=()=>{const v=$('viewBtn');if(v){vwB.textContent=v.textContent;vwB.style.display='';}else vwB.style.display='none';};
+    vwB.addEventListener('click',()=>{vwB.blur();const v=$('viewBtn');if(v)v.click();vwSync();});
+    syncs.push(vwSync);
+    const fsB=document.createElement('button');fsB.className='btn ghost optBtn';fsB.textContent='Toggle fullscreen';oh.appendChild(fsB);
+    fsB.addEventListener('click',()=>{fsB.blur();try{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen();}catch(e){}});
+    const clB=document.createElement('button');clB.className='btn ghost optBtn';clB.textContent='Change log';oh.appendChild(clB);
+    const lp=document.createElement('div');lp.id='logPage';lp.className='overlay pgOv hidden';
+    {const cur=SAVE_KEY.indexOf('tester')>=0?BB_V.tester:BB_V.main;let h='<div class="parch" style="width:min(640px,100%)"><h2>Change log</h2>';
+     for(const e of CHANGELOG){if(e.v>cur)continue;h+='<h3 style="margin:14px 0 4px;font-family:var(--font-display);font-weight:400;font-size:26px">'+(e.d==='Earlier'?'Version '+e.v+' and earlier':'Version '+e.v+' <span style="font-size:15px;opacity:.7">'+e.d+'</span>')+'</h3><ul style="margin:0;padding-left:20px;line-height:1.45">'+e.n.map(x=>'<li>'+x+'</li>').join('')+'</ul>';}
+     h+='<button class="btn back">Back</button></div>';lp.innerHTML=h;stage.appendChild(lp);
+     lp.querySelector('.back').addEventListener('click',e=>{e.target.blur();openPage(op);});}
+    clB.addEventListener('click',()=>{clB.blur();openPage(lp);});
+    const ob=document.createElement('button');ob.className='btn back';ob.textContent='Back';oh.appendChild(ob);
+    ob.addEventListener('click',()=>{ob.blur();closePage();});
+    op.__sync=()=>syncs.forEach(f=>f());
+    stage.appendChild(op);
+    optBtn.addEventListener('click',()=>{optBtn.blur();openPage(op);});
+    // pause menu shortcuts
+    const pm=document.querySelector('#pause .parch'),rs=$('resume');
+    if(pm&&rs){
+      const a=document.createElement('button');a.className='btn ghost';a.id='pCtrl';a.style.marginTop='12px';a.textContent='Controls';a.addEventListener('click',()=>{a.blur();openPage(cp);});
+      const b=document.createElement('button');b.className='btn ghost';b.id='pOpt';b.style.marginTop='12px';b.textContent='Options';b.addEventListener('click',()=>{b.blur();openPage(op);});
+      rs.after(a);a.after(b);
+    }
+    window.__bbMenu=showMainMenu;
+  }catch(e){console.error('title menu',e);}
+})();
+
 $('startBtn').addEventListener('click',()=>{$('startBtn').blur();if(G.ready)startGame(false);});
 $('contBtn').addEventListener('click',()=>{$('contBtn').blur();if(G.ready)startGame(true);});
 $('delBtn').addEventListener('click',()=>{$('delBtn').blur();try{localStorage.removeItem(SAVE_KEY);}catch(e){}G.hasSave=false;$('contBtn').classList.add('hidden');$('delBtn').classList.add('hidden');$('saveInfo').textContent='Saved game deleted.';$('startBtn').textContent='Set Sail';});
@@ -3213,9 +3871,9 @@ function padKey(k){
   return ({E:n.A,F:n.B,Q:n.B,H:n.X,V:n.Y,R:n.LB,T:n.RB})[k]||k;
 }
 function padLabelHTML(v){
-  if(pad.touch)return v.replace(/<b>LMB<\/b>/g,'<b>FIRE</b>').replace(/<b>RMB<\/b>/g,'<b>ALT</b>').replace(/<b>Tab<\/b>wheel/g,'<b>WHEEL</b>').replace(/<b>F<\/b>Leave/g,'<b>LEAVE</b>').replace(/<span style="opacity:\.7">.*?<\/span>/g,'');
+  if(pad.touch)return v.replace(/<b>G<\/b>/g,'<b>SWAP</b>').replace(/<b>LMB<\/b>/g,'<b>FIRE</b>').replace(/<b>RMB<\/b>/g,'<b>ALT</b>').replace(/<b>Tab<\/b>wheel/g,'<b>WHEEL</b>').replace(/<b>F<\/b>Leave/g,'<b>LEAVE</b>').replace(/<span style="opacity:\.7">.*?<\/span>/g,'');
   const n=pad.ps?PADN.ps:PADN.xbox;
-  return v.replace(/<b>LMB<\/b>/g,'<b>'+n.RT+'</b>').replace(/<b>RMB<\/b>/g,'<b>'+n.LT+'</b>').replace(/<b>Tab<\/b>wheel/g,'<b>'+n.LB+'</b>wheel').replace(/<b>F<\/b>Leave/g,'<b>'+n.B+'</b>Leave').replace(/Tab wheel/g,n.LB+'/'+n.RB+' swap');
+  return v.replace(/<b>G<\/b>/g,'<b>'+n.RB+'</b>').replace(/<b>LMB<\/b>/g,'<b>'+n.RT+'</b>').replace(/<b>RMB<\/b>/g,'<b>'+n.LT+'</b>').replace(/<b>Tab<\/b>wheel/g,'<b>'+n.LB+'</b>wheel').replace(/<b>F<\/b>Leave/g,'<b>'+n.B+'</b>Leave').replace(/Tab wheel/g,n.LB+'/'+n.RB+' swap');
 }
 function padRange(){return G.deck?230:(player.ship?420:300);}
 function mouseWorld(cx,cy,z,bx,by,R){
@@ -3264,10 +3922,10 @@ function padShopNav(g,dt,press,ly){
   if(pad.si>=items.length)pad.si=items.length-1;
   items.forEach((b,i)=>b.classList.toggle('padsel',i===pad.si));
   const sel=items[pad.si];if(sel&&sel.scrollIntoView&&d)sel.scrollIntoView({block:'nearest'});
-  if(press(0)&&ok(pad.si)){buy(+sel.dataset.i);}
+  if(press(0)&&ok(pad.si)){shopPick(sel);}
 }
 function padMenu(root,dt,press,lx,ly,onBack){
-  const btns=pad.menuFn?pad.menuFn(root):[...root.querySelectorAll('button')].filter(b=>!b.classList.contains('hidden')&&!b.disabled&&b.id!=='delBtn');
+  const btns=pad.menuFn?pad.menuFn(root):[...root.querySelectorAll('button')].filter(b=>!b.classList.contains('hidden')&&!b.disabled&&b.id!=='delBtn'&&b.offsetParent!==null);
   if(!btns.length)return;
   if(pad.menuRoot!==root){pad.menuRoot=root;pad.mi=0;}
   pad.mi=clamp(pad.mi|0,0,btns.length-1);
@@ -3308,14 +3966,16 @@ function padPoll(dt){
   pad.prev=pr;
   const wasPrev=pad._p2||[];pad._p2=pr;
   const press2=i=>!!pr[i]&&!wasPrev[i];
+  if(UI.page){if(G.state==='play')padReleaseAll();padMenu(UI.page,dt,press2,lx,ly,closePage);return;}
   if(G.state==='title'){
-    if(G.ready)padMenu($('title'),dt,press2,lx,ly,null);
+    if(G.ready){if(!UI.menu){if(press2(0)||press2(9))showMainMenu();}else padMenu($('mainMenu'),dt,press2,lx,ly,null);}
     return;
   }
   if(G.state!=='play')return;
   if(G.dbg){padReleaseAll();return;}
   if(G.paused){padReleaseAll();if(press2(9)){setPaused(false);return;}padMenu($('pause'),dt,press2,lx,ly,()=>setPaused(false));return;}
   padMenuClear();
+  if(G.stashOpen){padReleaseAll();padMenu($('stashOv'),dt,press2,lx,ly,closeStash);return;}
   if(G.shop){padReleaseAll();padShopNav(g,dt,press2,ly);return;}
   if(press2(9)){onKey('Escape');return;}
   if(press2(8)||(G.bigmap&&!G.tp&&(press2(1)||press2(3)))){onKey('KeyM');return;}
@@ -3341,6 +4001,7 @@ function padPoll(dt){
   if(press2(0))onKey('KeyE');
   if(press2(1)){if(player.ship)onKey('KeyF');else if(player.horse)onKey('KeyQ');}
   if(press2(2))onKey('KeyH');
+  if(press2(5))onKey('KeyG');
   if(press2(3))onKey('KeyV');
   if(b(12))G.zoomMul=clamp(G.zoomMul*(1+dt*0.9),0.6,1.6);
   if(b(13))G.zoomMul=clamp(G.zoomMul*(1-dt*0.9),0.6,1.6);
@@ -3460,8 +4121,8 @@ function musicUpdate(dt){
   }
 }
 /* ================= SCENES: dungeon, boss lair and prison (grid interiors that reuse the deck engine) ================= */
-const SC={WALL:0,FLOOR:1,DOWN:2,UP:3,PILLAR:4,DOOR:5,BARS:6,CHEST:7,RUG:8,PORTAL:10,GATE:12,BED:13,TABLE:14,EXIT:15,RUBBLE:16};
-const SC_SOLID=new Uint8Array(32);[0,4,5,6,7,12,14].forEach(i=>SC_SOLID[i]=1);
+const SC={WALL:0,FLOOR:1,DOWN:2,UP:3,PILLAR:4,DOOR:5,BARS:6,CHEST:7,RUG:8,PORTAL:10,GATE:12,BED:13,TABLE:14,EXIT:15,RUBBLE:16,WARD:17,BARREL:18,DESK:19};
+const SC_SOLID=new Uint8Array(32);[0,4,5,6,7,12,13,14,17,18,19].forEach(i=>SC_SOLID[i]=1);
 const SC_OPAQUE=new Uint8Array(32);[0,4,5,7,14].forEach(i=>SC_OPAQUE[i]=1);
 function gridHit(D,x,y,r){
   const x0=Math.floor((x-r)/TS),x1=Math.floor((x+r)/TS),y0=Math.floor((y-r)/TS),y1=Math.floor((y+r)/TS);
@@ -3751,7 +4412,7 @@ function updateScene(dt){
   mouseWorld(D.cam.x,D.cam.y,D.cam.z,D.p.x,D.p.y,padRange());
   const p=D.p,up=keys.KeyW||keys.ArrowUp,dn=keys.KeyS||keys.ArrowDown,lf=keys.KeyA||keys.ArrowLeft,rt=keys.KeyD||keys.ArrowRight;
   let dx=(rt?1:0)-(lf?1:0),dy=(dn?1:0)-(up?1:0);let l=Math.hypot(dx,dy);if(l>0){dx/=l;dy/=l;}
-  if(pad.fm>0&&l===0){dx=pad.fx*pad.fm;dy=pad.fy*pad.fm;l=pad.fm;}
+  if(pad.fm>0&&l===0){dx=pad.fx*pad.fm;dy=pad.fy*pad.fm;l=pad.fm;}if(isDrunk()&&!player.horse){dx=-dx;dy=-dy;}
   const sh=!!(keys.ShiftLeft||keys.ShiftRight);
   D.sneak=D.scene==='prison'&&sh;
   const spd=D.scene==='prison'?(sh?50:92):112*(sh?1.4:1);
@@ -3759,8 +4420,7 @@ function updateScene(dt){
   if(l>0){P.walk+=dt*spd/55;deckMove(D,p,dx*spd*dt,dy*spd*dt,7);}
   D.pa=Math.atan2(mouse.wy-p.y,mouse.wx-p.x);
   if(!D.unarmed){
-    if((mouse.down||keys.Space)&&P.cool<=0)deckSwing(D);
-    if((mouse.rdown||keys.KeyF)&&P.reload<=0)deckFire(D);
+    handUse(0,D,mouse.down||keys.Space);handUse(1,D,mouse.rdown||keys.KeyF);
     if(D.hitIn>0){D.hitIn-=dt;if(D.hitIn<=0)deckMelee(D);}
   }else if(mouse.rdown&&D.scene==='prison'&&P.reload<=0)prisonThrow(D);
   // exploration map
@@ -3798,10 +4458,11 @@ function updateScene(dt){
   for(const b of D.bombs){
     b.t-=dt;
     if(b.fl>0){b.fl-=dt;const nx=b.x+b.vx*dt,ny=b.y+b.vy*dt;if(gridHit(D,nx,ny,3)){b.vx*=-0.2;b.vy*=-0.2;b.fl=0;}else{b.x=nx;b.y=ny;}}
-    if(Math.random()<0.7)addP(b.x+3,b.y-5,rr(-12,12),rr(-12,12),0.25,2,'rgba(255,170,60,.9)');
-    if(b.t<=0){b.dead=true;deckBlast(D,b.x,b.y);if(G.deck!==D)return;}
+    if(Math.random()<0.7)addP(b.x+3,b.y-5,rr(-12,12),rr(-12,12),0.25,2,b.kind==='rum'?'rgba(150,230,170,.8)':'rgba(255,170,60,.9)');
+    if(b.t<=0){b.dead=true;bombEnd(b,D);if(G.deck!==D)return;}
   }
   compact(D.bombs,b=>!b.dead);
+  fireStep(D.fires||(D.fires=[]),dt,D);
   // pickups
   for(const k of D.pick){
     if(k.dead||k.type==='chestmark')continue;
@@ -3862,6 +4523,7 @@ function sceneInteract(D){
     if(D.portal){const d=Math.hypot(D.portal.x-p.x,D.portal.y-p.y);if(d<52)consider({d,id:'portal',label:'Step into the light',run(){exitDungeon(true);}});}
   }
   if(D.scene==='prison')prisonInteract(D,consider);
+  if(D.scene==='int')intInteract(D,consider);
   return best;
 }
 
@@ -4006,6 +4668,13 @@ const SC_THEME={
   crypt:{f1:'#3f3d4c',f2:'#383645',wall:'#14131a',face:'#2c2a38',edge:'#6f6a88',dark:0.86,tint:'60,70,140'},
   bones:{f1:'#4b4538',f2:'#433e32',wall:'#17140e',face:'#3a3426',edge:'#8a8062',dark:0.88,tint:'120,100,60'},
   lair:{f1:'#322c44',f2:'#2b263b',wall:'#0f0c17',face:'#251e38',edge:'#7a52b8',dark:0.84,tint:'110,50,170'},
+  inn:{f1:'#6b4a2b',f2:'#634526',wall:'#241608',face:'#5a3c1e',edge:'#b58a52',dark:0.3,tint:'255,170,80'},
+  forge:{f1:'#55524e',f2:'#4d4a46',wall:'#1a1816',face:'#3a3836',edge:'#9a948a',dark:0.34,tint:'255,150,70'},
+  barn:{f1:'#7a6238',f2:'#725a32',wall:'#2a1c0c',face:'#5a4224',edge:'#c9a24a',dark:0.3,tint:'255,190,90'},
+  hall:{f1:'#8a8478',f2:'#7e786c',wall:'#2a2824',face:'#6a6458',edge:'#e6c25a',dark:0.26,tint:'255,220,150'},
+  castle:{f1:'#6e6a78',f2:'#66626f',wall:'#1c1b24',face:'#4a4658',edge:'#ffd75a',dark:0.34,tint:'255,215,120'},
+  shipin:{f1:'#6a4a28',f2:'#5f4122',wall:'#1e1208',face:'#4a3018',edge:'#a8783c',dark:0.4,tint:'255,170,70'},
+  yard:{f1:'#6b5a3c',f2:'#63532f',wall:'#201808',face:'#54401f',edge:'#b8924a',dark:0.3,tint:'255,190,100'},
   prison:{f1:'#4b4844',f2:'#44413d',wall:'#17171b',face:'#34333b',edge:'#7a7885',dark:0.8,tint:'60,60,90'}
 };
 function sceneTile(D,t,tx,ty,th,T){
@@ -4031,13 +4700,16 @@ function sceneTile(D,t,tx,ty,th,T){
     case SC.PILLAR:{ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.arc(x+TS/2+3,y+TS/2+4,TS*0.5,0,TAU);ctx.fill();ctx.fillStyle=th.face;ctx.beginPath();ctx.arc(x+TS/2,y+TS/2,TS*0.46,0,TAU);ctx.fill();ctx.fillStyle=th.edge;ctx.globalAlpha=0.45;ctx.beginPath();ctx.arc(x+TS/2-3,y+TS/2-3,TS*0.3,0,TAU);ctx.fill();ctx.globalAlpha=1;break;}
     case SC.DOWN:{for(let i=0;i<5;i++){ctx.fillStyle='rgba(0,0,0,'+(0.12+i*0.17)+')';ctx.fillRect(x,y+i*(TS/5),TS,TS/5+1);}ctx.fillStyle='#d8d0ff';ctx.font='700 14px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('▼',x+TS/2,y+TS/2);break;}
     case SC.UP:{for(let i=0;i<5;i++){ctx.fillStyle='rgba(255,255,255,'+(0.04+i*0.04)+')';ctx.fillRect(x,y+i*(TS/5),TS,TS/5+1);}ctx.fillStyle='#d8d0ff';ctx.font='700 14px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('▲',x+TS/2,y+TS/2);break;}
-    case SC.EXIT:{ctx.fillStyle='rgba(120,200,255,'+(0.25+0.15*Math.sin(T*3))+')';ctx.fillRect(x,y,TS,TS);ctx.fillStyle='#bfe6ff';ctx.font='700 13px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('SEA',x+TS/2,y+TS/2);break;}
+    case SC.EXIT:{ctx.fillStyle='rgba(120,200,255,'+(0.25+0.15*Math.sin(T*3))+')';ctx.fillRect(x,y,TS,TS);ctx.fillStyle='#bfe6ff';ctx.font='700 13px Georgia';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(D.scene==='int'?(D.ship?'DECK':'OUT'):'SEA',x+TS/2,y+TS/2);break;}
     case SC.PORTAL:{const pu=0.5+0.5*Math.sin(T*4+tx);ctx.fillStyle='rgba(180,120,255,'+(0.35+0.25*pu)+')';ctx.fillRect(x,y,TS,TS);break;}
     case SC.DOOR:{ctx.fillStyle='#6a4a28';ctx.fillRect(x,y,TS,TS);ctx.strokeStyle='#2a1a0a';ctx.lineWidth=2;for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(x+i*TS/4,y);ctx.lineTo(x+i*TS/4,y+TS);ctx.stroke();}ctx.fillStyle='#c9a24a';ctx.beginPath();ctx.arc(x+TS*0.75,y+TS/2,3,0,TAU);ctx.fill();break;}
     case SC.BARS:{ctx.strokeStyle='#8e939e';ctx.lineWidth=2.5;for(let i=0;i<5;i++){ctx.beginPath();ctx.moveTo(x+3+i*(TS-6)/4,y);ctx.lineTo(x+3+i*(TS-6)/4,y+TS);ctx.stroke();}ctx.strokeStyle='#5a5e68';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x,y+TS*0.3);ctx.lineTo(x+TS,y+TS*0.3);ctx.stroke();break;}
     case SC.GATE:{ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(x,y,TS,TS);ctx.strokeStyle='#7a808c';ctx.lineWidth=3;for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(x+3+i*(TS-6)/3,y);ctx.lineTo(x+3+i*(TS-6)/3,y+TS);ctx.stroke();}ctx.strokeStyle='#4a4e58';ctx.beginPath();ctx.moveTo(x,y+TS/2);ctx.lineTo(x+TS,y+TS/2);ctx.stroke();ctx.fillStyle='#d6a640';ctx.fillRect(x+TS/2-4,y+TS/2-4,8,8);break;}
     case SC.CHEST:{const op=D.L&&D.L.opened&&D.L.opened[ty*D.W+tx];ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(x+5,y+9,TS-6,TS-12);ctx.fillStyle='#6b4a2b';ctx.fillRect(x+4,y+8,TS-8,TS-12);ctx.fillStyle=op?'#2a1a0a':'#8a6238';ctx.fillRect(x+4,y+8,TS-8,9);ctx.fillStyle='#d6a640';ctx.fillRect(x+4,y+16,TS-8,2);if(!op)ctx.fillRect(x+TS/2-2,y+14,4,5);else{ctx.fillStyle='#ffd75a';ctx.fillRect(x+9,y+11,TS-18,4);}break;}
-    case SC.BED:{ctx.fillStyle='#5a4630';ctx.fillRect(x+3,y+4,TS-6,TS-8);ctx.fillStyle='#c8c0a8';ctx.fillRect(x+5,y+6,TS-10,10);ctx.fillStyle='#7a2f2f';ctx.fillRect(x+5,y+16,TS-10,TS-22);break;}
+    case SC.BED:{const lo=gridAt(D,tx,ty-1)===SC.BED;ctx.fillStyle='rgba(0,0,0,.28)';ctx.fillRect(x+4,y+3,TS-4,TS-2);ctx.fillStyle='#5a4630';ctx.fillRect(x+2,y,TS-4,TS);if(!lo){ctx.fillStyle='#e6e0cc';ctx.fillRect(x+5,y+3,TS-10,10);}ctx.fillStyle='#7a2f2f';ctx.fillRect(x+5,lo?y:y+14,TS-10,lo?TS-4:TS-18);break;}
+    case SC.BARREL:{ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.arc(x+TS/2+2,y+TS/2+3,TS*0.4,0,TAU);ctx.fill();ctx.fillStyle='#6b4a2b';ctx.beginPath();ctx.arc(x+TS/2,y+TS/2,TS*0.4,0,TAU);ctx.fill();ctx.strokeStyle='#3a2410';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x+TS/2,y+TS/2,TS*0.3,0,TAU);ctx.stroke();ctx.fillStyle='#8a6238';ctx.beginPath();ctx.arc(x+TS/2,y+TS/2,TS*0.14,0,TAU);ctx.fill();break;}
+    case SC.DESK:{ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(x+2,y+5,TS,TS-4);ctx.fillStyle='#5a3c1e';ctx.fillRect(x,y+2,TS,TS-4);ctx.fillStyle='#7a5430';ctx.fillRect(x+2,y+4,TS-4,TS-8);ctx.fillStyle='#e6e0cc';ctx.fillRect(x+7,y+8,TS-16,TS-16);ctx.strokeStyle='#7a2f2f';ctx.lineWidth=1.4;ctx.strokeRect(x+9,y+11,TS-20,2);break;}
+    case SC.WARD:{ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(x+4,y+5,TS-6,TS-4);ctx.fillStyle='#5a3c1e';ctx.fillRect(x+2,y+2,TS-4,TS-4);ctx.fillStyle='#7a5430';ctx.fillRect(x+4,y+4,TS/2-5,TS-8);ctx.fillRect(x+TS/2+1,y+4,TS/2-5,TS-8);ctx.fillStyle='#d6a640';ctx.fillRect(x+TS/2-3,y+TS/2-2,2,4);ctx.fillRect(x+TS/2+1,y+TS/2-2,2,4);break;}
     case SC.TABLE:{ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(x+3,y+5,TS,TS-2);ctx.fillStyle='#6b4a2b';ctx.fillRect(x+1,y+3,TS-2,TS-6);ctx.fillStyle='#8a6238';ctx.fillRect(x+3,y+5,TS-6,TS-10);break;}
   }
 }
@@ -4105,7 +4777,7 @@ function guardCone(D,g,T){
 function renderScene(){
   const D=G.deck,c=D.cam,z=c.z,P=player,T=G.t,th=SC_THEME[D.L.theme]||SC_THEME.crypt,tk=TKV();drawQ=null;
   ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#050509';ctx.fillRect(0,0,VW,VH);
-  const sh=G.shake,ox=sh?rr(-sh,sh):0,oy=sh?rr(-sh,sh):0;
+  const sh=G.shake*OPT.shake,ox=sh?rr(-sh,sh):0,oy=sh?rr(-sh,sh):0;
   ctx.setTransform(DPR*z,0,0,DPR*z*tk,DPR*(VW/2-c.x*z+ox),DPR*(VH/2-c.y*z*tk+oy));
   const hw=VW/2/z+TS,hh=VH/2/(z*tk)+TS;
   const tx0=Math.max(0,Math.floor((c.x-hw)/TS)),tx1=Math.min(D.W-1,Math.floor((c.x+hw)/TS)),ty0=Math.max(0,Math.floor((c.y-hh)/TS)),ty1=Math.min(D.H-1,Math.floor((c.y+hh)/TS)+(tk<1?3:0));
@@ -4113,7 +4785,7 @@ function renderScene(){
   for(let ty=ty0;ty<=ty1;ty++)for(let tx=tx0;tx<=tx1;tx++){
     const g0=D.grid[ty*D.W+tx];
     sceneTile(D,g0,tx,ty,th,T);
-    if(tk<1){if(g0===SC.WALL)Q((ty+1)*TS,()=>tSceneWall(D,tx,ty,th));else if(SC_PROP(g0))Q((ty+1)*TS-(g0===SC.PILLAR||g0===SC.CHEST||g0===SC.TABLE?TS*0.5:0),()=>tSceneProp(D,g0,tx,ty,th));}
+    if(tk<1){if(g0===SC.WALL)Q((ty+1)*TS,()=>tSceneWall(D,tx,ty,th));else if(SC_PROP(g0))Q((ty+1)*TS-(g0===SC.PILLAR||g0===SC.CHEST||g0===SC.TABLE||g0===SC.BED||g0===SC.BARREL||g0===SC.DESK?TS*0.5:0),()=>tSceneProp(D,g0,tx,ty,th));}
   }
   for(const t of D.torches){
     if(t.x<c.x-hw||t.x>c.x+hw||t.y<c.y-hh||t.y>c.y+hh+(tk<1?200:0))continue;
@@ -4129,6 +4801,7 @@ function renderScene(){
     else{ctx.fillStyle='rgba(255,215,90,'+(0.25+0.2*pu)+')';ctx.beginPath();ctx.arc(k.x,k.y,18,0,TAU);ctx.fill();ctx.strokeStyle='#ffd75a';ctx.lineWidth=3;ctx.beginPath();ctx.arc(k.x-5,k.y,4.5,0,TAU);ctx.moveTo(k.x-0.5,k.y);ctx.lineTo(k.x+10,k.y);ctx.moveTo(k.x+7,k.y);ctx.lineTo(k.x+7,k.y+4);ctx.stroke();}
   }
   if(D.portal){const pu=0.5+0.5*Math.sin(T*3);ctx.fillStyle='rgba(190,130,255,'+(0.2+0.2*pu)+')';ctx.beginPath();ctx.arc(D.portal.x,D.portal.y,60+8*pu,0,TAU);ctx.fill();ctx.strokeStyle='rgba(235,210,255,.8)';ctx.lineWidth=3;for(let k=0;k<3;k++){ctx.beginPath();ctx.arc(D.portal.x,D.portal.y,20+k*14,T*2+k,T*2+k+4.2);ctx.stroke();}}
+  drawFires(D.fires);
   for(const o of D.corpses)Q(o.y-1,()=>{ctx.globalAlpha=0.6;drawFolk({corpse:tk<1,x:o.x,y:o.y,a:o.a,coat:o.coat,coat2:o.coat2,skin:'#d9a878',hat:o.hat,walk:0,swing:0,weapon:null,flash:0,scale:o.scale});ctx.globalAlpha=1;});
   // guard sight cones first (under bodies)
   if(D.scene==='prison')for(const e of D.enemies){if(e.dead||e.kind!=='guard'||e.st==='ko'||e.st==='sleep')continue;guardCone(D,e,T);}
@@ -4147,6 +4820,9 @@ function renderScene(){
     });
   }
   if(D.prisoner){const pr=D.prisoner;Q(pr.y,()=>drawPrisoner(pr,T));}
+  if(D.npcs)for(const n of D.npcs)Q(n.y,()=>{drawFolk({x:n.x,y:n.y,a:n.a,coat:n.coat,coat2:n.coat2,skin:n.skin,hat:n.hat,walk:0,swing:0,weapon:null,flash:0});
+    atTop(n.x,n.y,(X,Y,u)=>{ctx.font='700 11px Georgia';ctx.textAlign='center';ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(n.name,X+1,Y-27+u);ctx.fillStyle=n.crown?'#ffd75a':'#ffe9a8';ctx.fillText(n.name,X,Y-28+u);});});
+  if(D.scene==='int'&&D.L.spots)for(const sp of D.L.spots){if(!sp.tag)continue;Q(sp.y+8,()=>atTop(sp.x,sp.y,(X,Y,u)=>{ctx.font='700 10px Georgia';ctx.textAlign='center';ctx.fillStyle='rgba(0,0,0,.55)';ctx.fillText(sp.tag,X+1,Y-(TILT()?30:20)+u);ctx.fillStyle='rgba(255,233,168,.85)';ctx.fillText(sp.tag,X,Y-(TILT()?31:21)+u);}));}
   const al=D.ally;
   if(al&&!al.dead)Q(al.y,()=>{
     drawFolk({x:al.x,y:al.y,a:al.a,coat:'#2f4a78',coat2:'#e8e2d0',skin:'#e0b48a',hat:'tricorn',walk:al.walk,swing:al.swing,swingMax:al.swingMax,weapon:'rapier',flash:al.flash});
@@ -4158,7 +4834,7 @@ function renderScene(){
   });
   const p=D.p;
   {
-    const pf={x:p.x,y:p.y,a:D.pa,coat:'#2b2630',coat2:'#b02a2a',skin:'#d9a878',hat:'bandana',walk:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:D.unarmed?null:(P.aimT>0?G.gun:G.melee),flash:P.flash};
+    const pf={x:p.x,y:p.y,a:D.pa,coat:G.look.coat,coat2:G.look.coat2,skin:G.look.skin,hat:G.look.hat,hatc:G.look.hatc,walk:P.walk,swing:P.swing,swingMax:P.swingMax,weapon:D.unarmed?null:heldW(P).weapon,hand:heldW(P).hand,flash:P.flash};
     Q(p.y+1,()=>{ctx.save();if(D.sneak)ctx.globalAlpha=0.9;drawFolk(pf);ctx.restore();});
     flushQ();
     if(tk<1&&sceneHidden(D,p.x,p.y)){ctx.save();ctx.globalAlpha=0.5;tFolk(pf);ctx.restore();}
@@ -4172,7 +4848,7 @@ function renderScene(){
   for(const b of D.bullets){ctx.strokeStyle=b.col||(b.own==='p'?'rgba(255,240,170,.9)':'rgba(255,200,120,.9)');ctx.lineWidth=b.knife?2.6:(b.own==='e'&&b.dmg>=14?3.2:2);const tl=b.knife?0.018:0.025;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.vx*tl,b.y-b.vy*tl);ctx.stroke();}
   ctx.restore();
   if(D.knives)for(const k of D.knives)drawKnife(k);
-  for(const b of D.bombs){const lf=tk<1?7/tk:0;if(tk<1){ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(b.x+2,b.y+3,5,3,0,0,TAU);ctx.fill();}ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(b.x,b.y-lf,5,0,TAU);ctx.fill();ctx.fillStyle=(Math.floor(G.t*14)%2)?'#ffb347':'#ff5a2a';ctx.beginPath();ctx.arc(b.x+3,b.y-5-lf,2.2,0,TAU);ctx.fill();}
+  drawBombs(D.bombs,tk<1?7/tk:0);
   drawParts(1);
   // darkness with light holes
   sceneDarkness(D,th,z,c);
@@ -4669,10 +5345,12 @@ STORY[6]={title:'Fugitive of the Crown',brief:'The Crown blames you for Lt. Hale
   onFail(m){m.redo=true;}};
 /* ---- zones that belong to the story ---- */
 function zoneUse(z){
+  if(z.kind==='tavern'||z.kind==='stable'||z.kind==='armory'||z.kind==='governor')return enterInterior(z);
+  if((z.kind==='shipyard'||z.kind==='registry')&&!player.ship)return enterInterior(z);
   if(z.kind==='throne'){
     if(mission&&mission.def.onThrone)return mission.def.onThrone(mission);
     if(G.story.s>=5)return say([{who:KING_NAME,txt:'You are not welcome in my hall, murderer.'}]);
-    return say([{who:KING_NAME,txt:G.story.s===0?'The Crown has no business with you today, pirate. Come back when you have made yourself useful.':'The King is busy. Return when you have news of Gravemaw.'}]);
+    return enterInterior(z);
   }
   if(z.kind==='cave'){
     if(G.story.s===3&&!G.story.haleDead&&mission&&mission.idx===103)return haleTalk();
@@ -4720,9 +5398,10 @@ function storySceneTick(D,dt){
   D.hint=null;
   if(D.exiting){
     const ex=D.exiting;ex.t+=dt;D.fadeOut=clamp(ex.t/0.8,0,1);
-    if(ex.t>=1.0){D.fadeOut=0;if(ex.kind==='prison')finishPrisonEscape();else finishExit();}
+    if(ex.t>=1.0){D.fadeOut=0;if(ex.kind==='prison')finishPrisonEscape();else if(ex.kind==='int')finishInterior();else finishExit();}
     return;
   }
+  if(D.scene==='int'){D.objText=null;D.guide=null;intTick(D,dt);return;}
   if(D.scene==='prison'){
     let hide=true,al=false;
     for(const e of D.enemies){if(e.dead||e.kind!=='guard'||e.st==='ko'||e.st==='sleep')continue;if(e.st==='alert')al=true;if(e.meter>0.05||e.st==='alert'||e.st==='search')hide=false;}
@@ -4756,12 +5435,282 @@ function storyLevelEnter(D){
   const L=D.L;banner(L.name.toUpperCase(),'Level '+(D.lv+1)+' of 3');
   if(D.lv===2)later2(D,1.5,()=>{if(D.ally&&!D.ally.dead)allyBark(D,'That is no ordinary dark. Careful.');});
 }
+/* ================= rum, the drunk state and the inventory ================= */
+G.drunk={t:0,buzz:0};
+const DRUNK_SECS=45,BUZZ_LIMIT=4;
+const isDrunk=()=>G.drunk.t>0;
+let drunkPill=null;
+function showDrunk(){
+  if(!drunkPill){drunkPill=document.createElement('div');drunkPill.style.cssText='position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:30;padding:5px 14px;border-radius:14px;background:rgba(40,16,50,.82);border:1px solid #c77dff;color:#f1d4ff;font:600 14px Georgia,serif;pointer-events:none;display:none';document.body.appendChild(drunkPill);}
+  const t=Math.max(0,Math.ceil(G.drunk.t));drunkPill.textContent='Drunk  '+Math.floor(t/60)+':'+String(t%60).padStart(2,'0')+'  (sleep cures it)';drunkPill.style.display='block';
+}
+function hideDrunk(){if(drunkPill)drunkPill.style.display='none';}
+function goDrunk(){
+  const P=player;
+  const fresh=!isDrunk();
+  G.drunk.t=Math.min(90,fresh?DRUNK_SECS:G.drunk.t+15);G.drunk.buzz=0;
+  if(fresh){P.hp=Math.min(P.hp,P.maxhp*0.5);banner('DRUNK','Controls turned about. Sleep it off, or wait it out.');G.shake=Math.max(G.shake,5);}
+  else toast('More rum. The sea is spinning.','bad');
+}
+function drinkRum(free){
+  const P=player;if(P.dead)return false;
+  if(!free){
+    if((G.items.rum|0)<=0){toast('No rum bottles. Buy them at a tavern.','bad');sfx('no');return false;}
+    G.items.rum--;
+  }
+  sfx('ui');
+  if(!isDrunk())P.hp=Math.min(P.maxhp,P.hp+18);
+  G.drunk.buzz+=1;
+  if(G.drunk.buzz>=BUZZ_LIMIT)goDrunk();
+  else toast('A swig of rum.'+(isDrunk()?'':' +18 health.')+(G.drunk.buzz>=BUZZ_LIMIT-1?' Easy now...':''),'good');
+  return true;
+}
+function drunkTick(dt){
+  const D=G.drunk;
+  if(D.t>0){
+    D.t-=dt;
+    if(D.t<=0){D.t=0;D.buzz=0;hideDrunk();if(!player.dead){player.hp=player.maxhp;toast('You sober up and feel fresh. Health restored.','good');}}
+    else showDrunk();
+  }else if(D.buzz>0)D.buzz=Math.max(0,D.buzz-dt/25);
+}
+let invOv=null;
+function invEl(){
+  if(invOv)return invOv;
+  const ov=document.createElement('div');ov.id='invOv';ov.className='overlay hidden';ov.style.zIndex=60;
+  const card=document.createElement('div');card.className='parch';card.style.textAlign='center';ov.appendChild(card);
+  document.getElementById('pause').parentNode.appendChild(ov);invOv=ov;return ov;
+}
+function buildInv(){
+  const ov=invEl(),card=ov.firstChild;card.innerHTML='';
+  const mk=(tag,txt,st)=>{const e=document.createElement(tag);if(txt)e.textContent=txt;if(st)e.style.cssText=st;card.appendChild(e);return e;};
+  mk('h2','Inventory','font-size:32px;margin:0');
+  mk('p','Gold: '+G.gold,'font-size:14px;margin:0 0 8px');
+  const row=(name,count,sub,btnTxt,fn,okNow)=>{
+    const r=document.createElement('div');r.style.cssText='display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;border:1px solid rgba(80,50,20,.45);border-radius:8px;padding:8px 10px;margin:6px 0;text-align:left';
+    const l=document.createElement('div');l.innerHTML='<b>'+name+'</b> &times;'+count+'<div style="font-size:12px;opacity:.75">'+sub+'</div>';r.appendChild(l);
+    if(btnTxt){const b=document.createElement('button');b.className='btn ghost';b.style.cssText='display:inline-block;width:auto;margin:0;padding:6px 12px;font-size:15px';b.textContent=btnTxt;b.disabled=!okNow;if(!okNow)b.style.opacity=.45;b.addEventListener('click',()=>{fn();buildInv();b.blur();});r.appendChild(b);}
+    card.appendChild(r);
+  };
+  row('Ship papers',G.items.papers|0,'One set claims one ship. Sign at the captain\'s desk, below deck on the ship.');
+  row('Horse tonic',G.items.tonic|0,'Heals or revives your steed (stand beside it or ride it).','Use',()=>useTonic(),(G.items.tonic|0)>0&&!G.deck);
+  row('Bottle of rum',G.items.rum|0,'Mild healing. Too many and you get drunk: health drops to half and your controls turn about.','Drink',()=>drinkRum(false),(G.items.rum|0)>0);
+  if(isDrunk())mk('p','You are drunk for another '+Math.ceil(G.drunk.t)+'s. Sleeping cures it.','font-size:13px;margin:6px 0;color:#6a2a8a');
+  const cl=mk('button','Close','display:block;width:100%;margin-top:12px');cl.className='btn';cl.addEventListener('click',()=>{cl.blur();closeStash();});
+}
+function openInv(){
+  if(WHEEL.close)WHEEL.close();
+  G.stashOpen=true;mouse.down=false;mouse.rdown=false;
+  buildInv();invEl().classList.remove('hidden');
+}
+const invVisible=()=>!!invOv&&!invOv.classList.contains('hidden');
+/* ================= interiors: shops, castle, below deck ================= */
+const INT_STYLE={
+  tavern:{theme:'inn',W:15,H:11,keeper:{name:'Innkeeper',coat:'#7a4a2a',coat2:'#e8dcc0',skin:'#d9a878',hat:'none'},food:['Hot stew',8,60],tag:'Browse the bar',bed:'Rent the room'},
+  armory:{theme:'forge',W:15,H:11,keeper:{name:'Armourer',coat:'#4a4a52',coat2:'#c9a24a',skin:'#c9966a',hat:'cap'},tag:'Browse the armoury',bed:'Rest on the cot'},
+  stable:{theme:'barn',W:15,H:11,keeper:{name:'Stablemaster',coat:'#5a4a2a',coat2:'#d9bd72',skin:'#d9a878',hat:'straw'},tag:'See the horses',bed:'Rest in the hayloft'},
+  governor:{theme:'hall',W:17,H:11,keeper:{name:'Governor',coat:'#2f4a78',coat2:'#e6c25a',skin:'#e0b48a',hat:'tricorn'},food:['Roast fowl',14,80],tag:'Speak with the Governor',bed:'Take the guest bed'},
+  shipyard:{theme:'yard',W:17,H:11,keeper:{name:'Shipwright',coat:'#3a5a6a',coat2:'#d6c9a0',skin:'#c9966a',hat:'cap'},tag:'Talk to the shipwright'},
+  registry:{theme:'hall',W:13,H:9,keeper:{name:'Harbour Clerk',coat:'#4a3a2a',coat2:'#e8dcc0',skin:'#d9a878',hat:'none'},tag:'Buy ship papers'},
+  throne:{theme:'castle',W:21,H:13,keeper:{name:'King',coat:'#7a1f2a',coat2:'#ffd75a',skin:'#e0b48a',hat:'tricorn'}}
+};
+function genInterior(kind,o){
+  o=o||{};
+  const st=INT_STYLE[kind],W=st.W,H=st.H,L=newLevel(W,H,st.theme);L.name=o.name||'';
+  fillRect(L,0,0,W-1,H-1,SC.WALL);fillRect(L,1,1,W-2,H-2,SC.FLOOR);
+  const set=(x,y,t)=>{L.grid[y*W+x]=t;},cx=W>>1,px=tx=>(tx+0.5)*TS;
+  L.spots=[];L.npcs=[];L.keepSpot=null;
+  set(cx,H-1,SC.EXIT);
+  L.spawn={x:px(cx),y:px(H-2)};
+  L.spots.push({k:'exit',x:px(cx),y:px(H-1),r:48,label:'Leave',tag:''});
+  L.torches.push({x:3.5*TS,y:0.55*TS},{x:(W-3.5)*TS,y:0.55*TS},{x:cx*TS,y:0.55*TS});
+  if(kind==='throne'){
+    fillRect(L,cx-1,2,cx+1,H-2,SC.RUG);
+    for(const y of [3,6,9])for(const x of [4,W-5])set(x,y,SC.PILLAR);
+    for(let i=0;i<5;i++)L.torches.push({x:(3+i*3.5)*TS,y:0.55*TS});
+    const k=st.keeper;
+    L.npcs.push({x:px(cx),y:2.35*TS,a:PI/2,coat:k.coat,coat2:k.coat2,skin:k.skin,hat:k.hat,name:o.king||'The King',crown:true});
+    for(const sx of [-3,3])L.npcs.push({x:px(cx+sx),y:5*TS,a:PI/2,coat:'#2f4a78',coat2:'#e8e2d0',skin:'#d9a878',hat:'tricorn',name:'Royal Guard'});
+    L.spots.push({k:'keeper',x:px(cx),y:2.35*TS,r:92,label:'Address the King',tag:'',run:D=>{zoneUseThrone(D.zone);}});
+    return L;
+  }
+  // furniture shared by every shop
+  const k=st.keeper;
+  for(let x=3;x<=W-6;x++)set(x,3,SC.TABLE);
+  const mid=(3+W-6)/2+0.5;
+  L.npcs.push({x:mid*TS,y:2.4*TS,a:PI/2,coat:k.coat,coat2:k.coat2,skin:k.skin,hat:k.hat,name:k.name});
+  L.spots.push({k:'keeper',x:mid*TS,y:2.4*TS,r:96,label:st.tag,tag:'',run:D=>{openShop(D.zone);}});
+  fillRect(L,5,6,W-6,Math.min(8,H-3),SC.RUG);
+  set(2,7,SC.TABLE);set(3,7,SC.TABLE);
+  const f=st.food;
+  if(f)L.spots.push({k:'food',x:2.5*TS+16,y:7*TS+16,r:60,label:'Eat: '+f[0]+' - '+f[1]+' gold (heals '+f[2]+')',tag:'Meal',run:D=>intEat(D,f)});
+  if(kind==='tavern'){set(W-4,7,SC.TABLE);set(W-3,7,SC.TABLE);set(6,9,SC.TABLE);set(8,9,SC.TABLE);}
+  if(kind==='shipyard'){set(1,2,SC.BARREL);set(W-2,2,SC.BARREL);set(1,H-3,SC.BARREL);set(W-2,H-3,SC.BARREL);set(W-4,6,SC.TABLE);set(W-5,6,SC.TABLE);}
+  if(kind==='armory'){set(1,5,SC.CHEST);set(1,7,SC.CHEST);set(W-2,5,SC.CHEST);set(W-2,7,SC.CHEST);}
+  if(kind==='stable'){set(1,9,SC.RUBBLE);set(2,9,SC.RUBBLE);set(W-2,9,SC.RUBBLE);set(W-3,9,SC.RUBBLE);}
+  if(kind==='governor'){set(3,5,SC.PILLAR);set(W-4,5,SC.PILLAR);}
+  return L;
+}
+function genShipInterior(sh){
+  const s=ST[sh.type]||ST.sloop,big=s.L>=120?3:s.L>=90?2:s.L>=64?1:0;
+  const Wc=[10,12,14,18][big],W=Wc+7,H=[8,9,9,10][big],L=newLevel(W,H,'shipin');
+  L.name=(sh.name||s.name)+' - below deck';
+  fillRect(L,0,0,W-1,H-1,SC.WALL);fillRect(L,1,1,W-2,H-2,SC.FLOOR);
+  const set=(x,y,t)=>{L.grid[y*W+x]=t;},px=tx=>(tx+0.5)*TS,ex=Wc>>1,gy=H>>1;
+  L.spots=[];L.npcs=[];
+  for(let y=1;y<=H-2;y++)if(y!==gy&&y!==gy+1)set(Wc,y,SC.WALL);
+  set(ex,H-1,SC.EXIT);L.spawn={x:px(ex),y:px(H-2)};
+  L.spots.push({k:'exit',x:px(ex),y:px(H-1),r:48,label:'Climb to the deck',tag:''});
+  L.torches.push({x:2.5*TS,y:0.55*TS},{x:(Wc-2.5)*TS,y:0.55*TS},{x:(Wc+3.5)*TS,y:0.55*TS},{x:(W-2.5)*TS,y:0.55*TS});
+  const nm2=s.masts.length;
+  for(let i=0;i<nm2;i++){const mx=Math.round(((i+1)/(nm2+1))*(Wc-1));if(mx>=2&&mx<=Wc-2&&mx!==ex)set(mx,gy-1>1?gy-1:gy,SC.PILLAR);}
+  // crew deck: stash, rum barrel, galley
+  set(2,1,SC.CHEST);
+  L.spots.push({k:'chest',x:px(2),y:px(1),r:56,label:'Open the ship\'s weapon stash',tag:'Stash',run:D=>{if(!sh.own){toast('Only your own ship has a stash. Claim her at the captain\'s desk first.','bad');sfx('no');return;}D.stash=true;openStash();}});
+  set(4,1,SC.BARREL);set(5,1,SC.BARREL);
+  L.spots.push({k:'barrel',x:px(4)+16,y:px(1),r:60,label:'Drink from the rum barrel (on the ship\'s tab)',tag:'Rum barrel',run:D=>drinkRum(true)});
+  const tx=Wc-4;set(tx,2,SC.TABLE);set(tx+1,2,SC.TABLE);
+  L.spots.push({k:'food',x:(tx+1)*TS,y:2*TS+16,r:62,label:'Eat: Salt pork and biscuit - 5 gold (heals 45)',tag:'Galley',run:D=>intEat(D,['Salt pork and biscuit',5,45])});
+  // captain's quarters
+  fillRect(L,Wc+1,3,W-2,H-3,SC.RUG);
+  set(W-3,1,SC.BED);set(W-3,2,SC.BED);
+  L.spots.push({k:'bed',x:px(W-3),y:2*TS,r:64,label:'Sleep in the captain\'s bunk (heal and save)',tag:'Bunk',run:D=>intSleep(D)});
+  set(Wc+2,1,SC.WARD);
+  L.spots.push({k:'ward',x:px(Wc+2),y:px(1)+10,r:58,label:'Change clothes',tag:'Wardrobe',run:D=>openWard()});
+  set(Wc+3,H-3,SC.DESK);set(Wc+4,H-3,SC.DESK);
+  L.spots.push({k:'desk',x:(Wc+4)*TS,y:(H-3)*TS+16,r:66,tag:'Captain\'s desk',
+    label:D=>{
+      if(sh.own)return 'Captain\'s desk: the ship\'s log (nothing to sign yet)';
+      if(sh.fac!=='pirate')return 'Captain\'s desk';
+      if(fleetCount()>=3)return 'Captain\'s desk: your fleet is full (3/3). Sell a ship first.';
+      if((G.items.papers|0)<=0)return 'Captain\'s desk: you hold no ship papers. Buy a set at a Harbour Registry.';
+      return 'Claim the '+(ST[sh.type]||{}).name+' with a set of ship papers ('+G.items.papers+' held)';
+    },
+    run:D=>claimShip(D,sh)});
+  return L;
+}
+function claimShip(D,sh){
+  if(sh.own){toast('She is already yours.');return;}
+  if(fleetCount()>=3){toast('Your fleet is full. Sell a ship first.','bad');sfx('no');return;}
+  if((G.items.papers|0)<=0){toast('You hold no unused ship papers. Buy a set at a Harbour Registry.','bad');sfx('no');return;}
+  G.items.papers--;registerShip(sh);sfx('coin');
+  D.sceneName=sh.name+' - below deck';
+}
+function zoneUseThrone(z){
+  const q=G.story.s===0?'The Crown has no business with you today, pirate. Come back when you have made yourself useful.':'The King is busy. Return when you have news of Gravemaw.';
+  say([{who:KING_NAME,txt:q}]);
+}
+function intStart(D,L,name,zone){
+  const P=player;
+  D.levels=[L];D.unarmed=true;D.sceneName=name;D.zone=zone;D.npcs=L.npcs;D.stash=false;D.darkOverride=undefined;
+  G.deck=D;sceneLoadLevel(D,0,'down');
+  D.cam.z=clamp(Math.min(VW,VH)/560,0.95,1.6)*G.zoomMul;D.cam.x=D.p.x;D.cam.y=D.p.y;
+  closeShop();closeStash();G.board=null;G.grap=null;mouse.down=false;mouse.rdown=false;parts.length=0;
+  D.pa=-PI/2;sfx('ui');
+}
+function enterInterior(z){
+  const P=player;
+  if(z.law&&G.heat>0&&z.kind!=='throne'){toast("The guards won't let a wanted pirate in!",'bad');sfx('no');return;}
+  if(!INT_STYLE[z.kind])return openShop(z);
+  if(P.horse)dismount();
+  const D=mkSceneBase('int');
+  intStart(D,genInterior(z.kind,{name:z.name,king:typeof KING_NAME!=='undefined'?KING_NAME:'The King'}),z.name,z);
+}
+function enterShipInterior(sh){
+  const P=player;sh=sh||P.ship;if(!sh||G.deck||sh.fac!=='pirate')return;
+  const D=mkSceneBase('int');D.ship=sh;
+  intStart(D,genShipInterior(sh),(sh.name||(ST[sh.type]||{}).name||'Your ship')+' - below deck',null);
+}
+function finishInterior(){
+  const D=G.deck;G.deck=null;parts.length=0;mouse.down=false;mouse.rdown=false;closeStash();
+  const P=player;P.invuln=Math.max(P.invuln,0.6);cam.x=P.x;cam.y=P.y;
+}
+function intSleep(D){if(D.sleep||D.exiting)return;D.sleep={t:0,done:false};sfx('ui');}
+function intEat(D,f){
+  const P=player;
+  if(P.hp>=P.maxhp){toast('You are not hungry. Your health is full.');return;}
+  if(G.gold<f[1]){toast('Not enough gold for a meal.','bad');sfx('no');return;}
+  G.gold-=f[1];P.hp=Math.min(P.maxhp,P.hp+f[2]);sfx('coin');
+  toast(f[0]+'. +'+f[2]+' health.','good');
+}
+function intInteract(D,consider){
+  if(D.sleep||D.exiting||G.stashOpen)return;
+  const p=D.p,L=D.L;
+  for(const s of L.spots){
+    if(!s.run&&s.k!=='exit')continue;
+    const d=Math.hypot(s.x-p.x,s.y-p.y);if(d>s.r)continue;
+    consider({d:s.k==='exit'?d+30:d,id:s.k,label:typeof s.label==='function'?s.label(D):s.label,run(){if(s.k==='exit'){D.exiting={t:0,kind:'int'};sfx('ui');}else s.run(D);}});
+  }
+}
+function intTick(D,dt){
+  const s=D.sleep;
+  if(s){
+    s.t+=dt;D.fadeOut=s.t<0.9?s.t/0.9:s.t<1.5?1:Math.max(0,1-(s.t-1.5)/0.6);
+    if(!s.done&&s.t>=1.0){
+      s.done=true;const P=player;if(!isDrunk())P.hp=P.maxhp;G.tod=0.3;
+      if(G.steed&&G.steed.hp!==undefined&&G.steed.maxhp)G.steed.hp=G.steed.maxhp;
+      const was=isDrunk();if(was){G.drunk.t=0;G.drunk.buzz=0;hideDrunk();}
+      const ok=writeSave(true);
+      toast(was?'You sleep it off. Sober again, but not rested'+(ok?'. Game saved.':'.'):'You wake rested. Health restored'+(ok?'. Game saved.':'.'),'good');
+    }
+    if(s.t>=2.2){D.sleep=null;D.fadeOut=0;}
+  }
+}
+/* ---- wardrobe ---- */
+const LOOK_DEF={coat:'#2b2630',coat2:'#b02a2a',skin:'#d9a878',hat:'bandana',hatc:'#c0372c'};
+const WARD_OPT={
+  coat:['#2b2630','#3a2418','#1f3a5a','#2f5a3a','#6a2a2a','#5a4a7a','#c9bfa6','#111111'],
+  coat2:['#b02a2a','#d6a640','#e8e2d0','#2f6a8a','#3a8a4a','#7a3a8a','#1a1a1a','#c9582c'],
+  skin:['#f0cfae','#d9a878','#b98456','#8a5a38','#5a3a24'],
+  hatc:['#c0372c','#1c1c22','#2f5a8a','#3a4a6a','#3a8a4a','#e8e2d0','#6a2a8a','#d6a640'],
+  hat:[['bandana','Bandana','#c0372c'],['tricorn','Tricorn','#1c1c22'],['straw','Straw hat','#d9bd72'],['cap','Cap','#3a4a6a'],['none','Bare head','#4a3320']]
+};
+let wardOv=null;
+function wardEl(){
+  if(wardOv)return wardOv;
+  const ov=document.createElement('div');ov.id='wardOv';ov.className='hidden';
+  ov.style.cssText='position:fixed;left:0;top:0;bottom:0;width:min(340px,94vw);z-index:60;overflow:auto;padding:10px;box-sizing:border-box;';
+  const card=document.createElement('div');card.className='parch';card.style.textAlign='center';ov.appendChild(card);
+  document.getElementById('pause').parentNode.appendChild(ov);wardOv=ov;return ov;
+}
+function buildWard(){
+  const ov=wardEl(),card=ov.firstChild;card.innerHTML='';
+  const mk=(tag,txt,st)=>{const e=document.createElement(tag);if(txt)e.textContent=txt;if(st)e.style.cssText=st;card.appendChild(e);return e;};
+  mk('h2','Wardrobe','font-size:30px;margin:0');
+  mk('p','Changes show on your pirate right away.','font-size:13px;margin:0 0 6px');
+  const sw=(title,key,list)=>{
+    mk('h3',title,'margin:8px 0 3px;font-size:16px');
+    const row=mk('div','','display:flex;flex-wrap:wrap;justify-content:center;gap:6px');
+    for(const c of list){
+      const b=document.createElement('button');b.type='button';
+      b.style.cssText='width:30px;height:30px;border-radius:6px;cursor:pointer;background:'+c+';border:3px solid '+(G.look[key]===c?'#f4c542':'rgba(0,0,0,.55)');
+      b.setAttribute('aria-label',title+' '+c);
+      b.addEventListener('click',()=>{G.look[key]=c;sfx('ui');buildWard();b.blur();});row.appendChild(b);
+    }
+  };
+  sw('Coat','coat',WARD_OPT.coat);sw('Sash and trim','coat2',WARD_OPT.coat2);sw('Skin','skin',WARD_OPT.skin);
+  mk('h3','Headwear','margin:8px 0 3px;font-size:16px');
+  const hr=mk('div','','display:flex;flex-wrap:wrap;justify-content:center;gap:6px');
+  for(const [id,nm,dc] of WARD_OPT.hat){
+    const b=document.createElement('button');b.type='button';b.className='btn ghost';
+    b.style.cssText='display:inline-block;width:auto;margin:0;padding:5px 10px;font-size:14px;'+(G.look.hat===id?'outline:2px solid #f4c542':'');
+    b.textContent=nm;b.addEventListener('click',()=>{G.look.hat=id;G.look.hatc=dc;sfx('ui');buildWard();b.blur();});hr.appendChild(b);
+  }
+  if(G.look.hat==='bandana'||G.look.hat==='tricorn'||G.look.hat==='cap')sw('Hat colour','hatc',WARD_OPT.hatc);
+  const done=mk('button','Done','display:block;width:100%;margin-top:12px');done.className='btn';done.addEventListener('click',()=>{closeStash();done.blur();});
+  const rs=mk('button','Reset to default','display:block;width:100%;margin-top:6px');rs.className='btn ghost';rs.addEventListener('click',()=>{G.look=Object.assign({},LOOK_DEF);buildWard();rs.blur();});
+}
+function openWard(){
+  if(WHEEL.close)WHEEL.close();
+  G.stashOpen=true;mouse.down=false;mouse.rdown=false;
+  buildWard();wardEl().classList.remove('hidden');
+}
+
 function sceneHUD(){
   const D=G.deck,P=player,gw=WEAP[G.gun];
   hullRow.style.display='none';
   setTxt(goldTxt,'gold',String(G.gold));
   const extra=D.scene==='prison'?'<span style="opacity:.8">Pebbles <b>&times;'+(D.pebbles||0)+'</b> (RMB'+(D.unarmed?'':' / G')+') &nbsp; <b>Shift</b> creep</span>':'<span style="opacity:.7">Tab wheel &nbsp; <b>E</b> interact</span>';
-  setHTML(weaponEl,'w',D.unarmed?'<span><b>Unarmed</b> your weapons were confiscated</span>'+extra:'<span><b>LMB</b>'+WEAP[G.melee].n+'</span><span><b>RMB</b>'+gw.n+' &times;'+(G.ammo[gw.ammo]||0)+(P.reload>0.05?' (loading)':'')+'</span>'+extra);
+  setHTML(weaponEl,'w',D.scene==='int'?'<span><b>'+(D.sceneName||'')+'</b> weapons holstered</span>'+extra:D.unarmed?'<span><b>Unarmed</b> your weapons were confiscated</span>'+extra:hudW()+''+extra);
   if(hc.pr!==''){hc.pr='';promptEl.innerHTML='';promptEl.classList.add('hidden');}
   steedHudEl.classList.add('hidden');
   hurtEl.style.opacity=Math.max(G.hurtFlash,P.hp<30?0.25+0.2*Math.sin(G.t*6):0).toFixed(2);
@@ -4875,6 +5824,7 @@ function tCastle(){
 }
 /* ---- people ---- */
 function tFolk(o){
+  if(o.weapon==='knifeM')o.weapon='knives';else if(o.weapon==='hatchetM')o.weapon='hatchet';
   const sc=o.scale||1,s=sc*0.92,face=Math.cos(o.a)>=0?1:-1;
   const sink=o.sink|0;
   upr(o.x,o.y,()=>{
@@ -4894,13 +5844,14 @@ function tFolk(o){
     ctx.fillStyle=o.coat2;ctx.fillRect(-6*s,-13*s,12*s,2.5*s);
     // weapon / arm direction in screen space
     const dxs=Math.cos(o.a),dys=Math.sin(o.a)*TK,dl=Math.hypot(dxs,dys)||1,ux=dxs/dl,uy=dys/dl;
-    const hx=ux*6*s,hy=-14*s+uy*3*s;
+    const sg=o.hand===0?-1:1,hx=ux*6*s-uy*3.5*s*sg,hy=-14*s+uy*3*s+ux*1.5*s*sg;
     const wp=o.weapon;
     const line=(len,col,w,ang)=>{const ca=Math.cos(ang||0),sa=Math.sin(ang||0),vx=ux*ca-uy*sa,vy=ux*sa+uy*ca;ctx.strokeStyle=col;ctx.lineWidth=w;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(hx,hy);ctx.lineTo(hx+vx*len,hy+vy*len);ctx.stroke();};
     if(wp==='musket'||wp==='blunder'){line(22,'#4a3320',2.8,0);line(10,'#9a9a9a',1.4,0);}
     else if(wp==='pistol'||wp==='duel'){line(12,'#222',2.6,0);}
     else if(wp==='bomb'){ctx.fillStyle='#1a1a1e';ctx.beginPath();ctx.arc(hx+ux*5,hy+uy*5,4,0,TAU);ctx.fill();}
-    else if(wp==='knives'){line(10,'#dfe4ee',2,0);}
+    else if(wp==='knives'||wp==='hatchet'){line(10,'#dfe4ee',2,0);}
+    else if(wp==='rum'||wp==='molo'){ctx.fillStyle='#2f7d46';ctx.fillRect(hx+ux*4-2,hy+uy*4-4,4,8);}
     else if(wp==='sword'||wp==='cutlass'||wp==='rapier'||wp==='axe'){
       const sm=o.swingMax||0.28,pr=o.swing>0?1-o.swing/sm:0;
       const ang=o.swing>0?-1.3+pr*2.7:0.2;
@@ -4913,10 +5864,10 @@ function tFolk(o){
     ctx.fillStyle=o.skin||'#d9a878';ctx.beginPath();ctx.arc(face*0.8*s,-27*s,5*s,0,TAU);ctx.fill();
     const hy2=-29*s;
     switch(o.hat){
-      case 'tricorn':ctx.fillStyle='#1c1c22';tPoly([[-9*s,hy2+1*s],[0,hy2-8*s],[9*s,hy2+1*s],[0,hy2+3*s]],'#1c1c22');ctx.strokeStyle='#c9a74a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-9*s,hy2+1*s);ctx.lineTo(9*s,hy2+1*s);ctx.stroke();break;
-      case 'bandana':ctx.fillStyle='#c0372c';ctx.beginPath();ctx.arc(face*0.8*s,hy2+1*s,5.2*s,Math.PI,0);ctx.fill();ctx.beginPath();ctx.ellipse(-face*6*s,hy2+3*s,3.5*s,1.8*s,0.5,0,TAU);ctx.fill();break;
+      case 'tricorn':ctx.fillStyle='#1c1c22';tPoly([[-9*s,hy2+1*s],[0,hy2-8*s],[9*s,hy2+1*s],[0,hy2+3*s]],o.hatc||'#1c1c22');ctx.strokeStyle='#c9a74a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(-9*s,hy2+1*s);ctx.lineTo(9*s,hy2+1*s);ctx.stroke();break;
+      case 'bandana':ctx.fillStyle=o.hatc||'#c0372c';ctx.beginPath();ctx.arc(face*0.8*s,hy2+1*s,5.2*s,Math.PI,0);ctx.fill();ctx.beginPath();ctx.ellipse(-face*6*s,hy2+3*s,3.5*s,1.8*s,0.5,0,TAU);ctx.fill();break;
       case 'straw':ctx.fillStyle='#d9bd72';ctx.beginPath();ctx.ellipse(0,hy2+2*s,9*s,3*s,0,0,TAU);ctx.fill();ctx.fillStyle='#b99a52';ctx.beginPath();ctx.arc(0,hy2+1*s,4.5*s,Math.PI,0);ctx.fill();break;
-      case 'cap':ctx.fillStyle='#3a4a6a';ctx.beginPath();ctx.arc(face*0.8*s,hy2+1*s,5.4*s,Math.PI,0);ctx.fill();break;
+      case 'cap':ctx.fillStyle=o.hatc||'#3a4a6a';ctx.beginPath();ctx.arc(face*0.8*s,hy2+1*s,5.4*s,Math.PI,0);ctx.fill();break;
       case 'skull':ctx.fillStyle='#222';ctx.beginPath();ctx.arc(face*2.4*s,-27.5*s,1.2*s,0,TAU);ctx.arc(face*-0.4*s,-27.5*s,1.2*s,0,TAU);ctx.fill();break;
       default:ctx.fillStyle='#4a3320';ctx.beginPath();ctx.arc(face*0.4*s,hy2+1*s,5*s,Math.PI,0);ctx.fill();
     }
@@ -5139,6 +6090,10 @@ function tSceneProp(D,t,tx,ty,th){
   const x=tx*TS,y=ty*TS,l=(h)=>h/TK;
   if(t===SC.PILLAR){tTower({x:x+TS/2,y:y+TS/2},TS*0.42,44,th.face,tShade(th.face,.2),null,true);return;}
   if(t===SC.TABLE){tBox(x+1,y+3,TS-2,TS-6,14,'#8a6238','#6b4a2b');return;}
+  if(t===SC.BED){const lo=gridAt(D,tx,ty-1)===SC.BED,hi=gridAt(D,tx,ty+1)===SC.BED;tBox(x+2,y,TS-4,TS,10,'#7a2f2f','#5a4630');if(!lo){ctx.fillStyle='#e6e0cc';ctx.fillRect(x+5,y-10/TK+3,TS-10,9);}return;}
+  if(t===SC.BARREL){const cx=x+TS/2,cy=y+TS/2;tTower({x:cx,y:cy},TS*0.4,24,'#6b4a2b','#8a6238',null,true);upr(cx,cy,()=>{ctx.strokeStyle='#3a2410';ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(-TS*0.4,-7);ctx.lineTo(TS*0.4,-7);ctx.moveTo(-TS*0.4,-16);ctx.lineTo(TS*0.4,-16);ctx.stroke();});return;}
+  if(t===SC.DESK){tBox(x+1,y+3,TS-2,TS-6,17,'#7a5430','#5a3c1e');ctx.fillStyle='#e6e0cc';ctx.fillRect(x+7,y+3-17/TK+4,TS-16,TS-16);return;}
+  if(t===SC.WARD){tBox(x+2,y+4,TS-4,TS-8,44,'#7a5430','#5a3c1e');const fy=y+4+TS-8;ctx.fillStyle='#4a3018';ctx.fillRect(x+TS/2-0.7,fy-44/TK,1.4,44/TK);ctx.fillStyle='#d6a640';ctx.fillRect(x+TS/2-4,fy-22/TK,2,4);ctx.fillRect(x+TS/2+2,fy-22/TK,2,4);return;}
   if(t===SC.CHEST){
     const op=D.L&&D.L.opened&&D.L.opened[ty*D.W+tx];
     tBox(x+4,y+6,TS-8,TS-12,12,op?'#2a1a0a':'#8a6238','#6b4a2b');
@@ -5160,7 +6115,7 @@ function tSceneProp(D,t,tx,ty,th){
     if(g){ctx.fillStyle='#d6a640';ctx.fillRect(x+TS/2-4,fy-l(H*0.55)-4,8,8);}
   }
 }
-const SC_PROP=t=>t===SC.PILLAR||t===SC.TABLE||t===SC.CHEST||t===SC.DOOR||t===SC.BARS||t===SC.GATE;
+const SC_PROP=t=>t===SC.PILLAR||t===SC.TABLE||t===SC.CHEST||t===SC.DOOR||t===SC.BARS||t===SC.GATE||t===SC.BED||t===SC.WARD||t===SC.BARREL||t===SC.DESK;
 function sceneHidden(D,x,y){
   const tx=Math.floor(x/TS),ty=Math.floor(y/TS);
   for(let r=1;r<=2;r++){if(gridAt(D,tx,ty+r)===SC.WALL&&(ty+r+1)*TS>y&&y>(ty+r)*TS-SC_WH/TK)return true;}
@@ -5172,7 +6127,7 @@ function sceneHidden(D,x,y){
     const pm=document.getElementById('pause');if(!pm)return;
     const host=pm.querySelector('.parch');const after=document.getElementById('touchBtn')||document.getElementById('saveBtn');
     const b=document.createElement('button');b.className='btn ghost';b.id='viewBtn';b.style.marginTop='12px';
-    const lab=()=>{b.textContent=G.view==='tilt'?'View: Tilted (beta)':'View: Top-down';};lab();
+    const lab=()=>{b.textContent=G.view==='tilt'?'View: 3/4 angled (beta)':'View: Top';};lab();
     b.addEventListener('click',()=>{G.view=G.view==='tilt'?'top':'tilt';try{localStorage.setItem('blackwaterbay.view',G.view);}catch(e){}lab();b.blur();});
     if(after&&after.parentNode)after.parentNode.insertBefore(b,after.nextSibling);else if(host)host.appendChild(b);
   }catch(e){}
@@ -5181,12 +6136,60 @@ function sceneHidden(D,x,y){
 /* ---- pause menu: crew commands ---- */
 const CREW_FEE=40;
 function nearestPier(x,y){let best=null,bd=1e12;for(const k in PIERS){const p=PIERS[k],d=dist(p.px*TS,p.wy*TS,x,y);if(d<bd){bd=d;best=p;}}return best;}
+/* where a called ship appears: right beside you in water, at the island's own dock on land, or anchored off the nearest shore */
+function islandPier(x,y){
+  const K=100000,sx=Math.floor(x/TS),sy=Math.floor(y/TS),seen=new Set([sy*K+sx]),q=[sx,sy];let h=0;
+  const WT=Math.floor(WW/TS),HT=Math.floor(WH/TS);
+  while(h<q.length&&seen.size<70000){
+    const cx=q[h++],cy=q[h++];
+    for(let k=0;k<4;k++){
+      const nx=cx+(k===0?1:k===1?-1:0),ny=cy+(k===2?1:k===3?-1:0);
+      if(nx<0||ny<0||nx>=WT||ny>=HT)continue;
+      const key=ny*K+nx;if(seen.has(key))continue;
+      if(tileAt((nx+0.5)*TS,(ny+0.5)*TS)<2)continue;
+      seen.add(key);q.push(nx,ny);
+    }
+  }
+  let best=null,bd=1e12;
+  for(const id in PIERS){
+    const p=PIERS[id];let on=false;
+    for(let dx=0;dx<=2&&!on;dx++)for(let dy=-3;dy<=3;dy++)if(seen.has(Math.floor(p.wy+dy)*K+Math.floor(p.px+dx))){on=true;break;}
+    if(on){const d=dist(p.px*TS,p.wy*TS,x,y);if(d<bd){bd=d;best=p;}}
+  }
+  return best;
+}
+function shipClash(x,y,st,skip){for(const q of ships)if(!q.dead&&q!==skip&&dist(q.x,q.y,x,y)<(ST[q.type].L+st.L)*0.4)return true;return false;}
+function callSpot(f){
+  const P=player,st=ST[f.type],t0=tileAt(P.x,P.y);
+  if(t0<=1){ // swimming or wading: she drops anchor right beside you
+    const rMin=st.L*0.5+10;
+    for(let r=rMin;r<=rMin+130;r+=7)for(let k=0;k<24;k++){
+      const ang=k/24*TAU+r*0.37,x=P.x+Math.cos(ang)*r,y=P.y+Math.sin(ang)*r;
+      for(const a of [ang+PI/2,ang-PI/2,ang,P.a])if(shipFree(x,y,a,st)&&!shipClash(x,y,st,f))return {x,y,a,msg:'The '+nm(f)+' drops anchor beside you.'};
+    }
+  }else{
+    const pier=islandPier(P.x,P.y);
+    if(pier){const p=dockSpot(f.type,pier,f);return {x:p.x,y:p.y,a:-PI/2,msg:'The '+nm(f)+' sails into the harbour.'};}
+    // no dock on this island: anchor in the nearest open water off the shore
+    for(let r=60;r<=800;r+=24)for(let k=0;k<32;k++){
+      const ang=k/32*TAU+r*0.21,x=P.x+Math.cos(ang)*r,y=P.y+Math.sin(ang)*r;
+      if(tileAt(x,y)>1)continue;
+      const a=ang+PI/2;if(shipFree(x,y,a,st)&&!shipClash(x,y,st,f))return {x,y,a,msg:'No dock on this island. The '+nm(f)+' anchors in the nearest open water.'};
+    }
+  }
+  const pier=nearestPier(P.x,P.y);if(!pier)return null;
+  const p=dockSpot(f.type,pier,f);return {x:p.x,y:p.y,a:-PI/2,msg:'The '+nm(f)+' sails into port.'};
+}
+function summonTo(f,sp){
+  f.x=sp.x;f.y=sp.y;f.a=sp.a;f.v=0;f.thr=0;f.sail=0;f.turn=0;f.crew=null;
+  splashFx(f.x,f.y,false);sfx('splash',f.x,f.y);toast(sp.msg,'good');
+}
 function crewCall(f){
   const P=player;
   if(G.deck||P.dead||f.dead||f===P.ship||!f.own)return false;
   if(G.gold<CREW_FEE){toast('Not enough gold. The crew wants '+CREW_FEE+'.','bad');sfx('no');return false;}
-  const pier=nearestPier(P.x,P.y);if(!pier)return false;
-  G.gold-=CREW_FEE;sfx('coin');summonShip(f,pier);return true;
+  const spot=callSpot(f);if(!spot)return false;
+  G.gold-=CREW_FEE;sfx('coin');summonTo(f,spot);return true;
 }
 (function(){
   try{
@@ -5454,12 +6457,13 @@ function knifeLand(D,b){
   for(let i=0;i<10&&blk(x,y);i++){x-=ux*4;y-=uy*4;}
   if(!D&&tileAt(x,y)===TL.DEEP){addP(x,y,0,0,0.5,6,'rgba(255,255,255,.8)',{grow:30,ring:true,layer:0});return;}
   const arr=D?(D.knives||(D.knives=[])):knifeDrops;
-  arr.push({x,y,a:Math.atan2(b.vy,b.vx)+rr(-0.35,0.35),t:0});if(arr.length>40)arr.shift();
+  arr.push({x,y,a:Math.atan2(b.vy,b.vx)+rr(-0.35,0.35),t:0,kt:b.kt||'knives'});if(arr.length>40)arr.shift();
 }
 function knifeStep(D,arr,px,py,dt,canPick){
   if(!arr||!arr.length)return;
   for(const k of arr){k.t+=dt;if(k.t>240){k.dead=true;continue;}
-    if(canPick&&G.ammo.knives<AMMO_MAX.knives&&Math.hypot(k.x-px,k.y-py)<22){G.ammo.knives++;k.dead=true;sfx('ui');addP(k.x,k.y,0,0,0.35,5,'rgba(230,240,255,.9)',{grow:16,ring:true,layer:0});}}
+    const kk=k.kt||'knives';
+    if(canPick&&G.ammo[kk]<AMMO_MAX[kk]&&Math.hypot(k.x-px,k.y-py)<22){G.ammo[kk]++;k.dead=true;sfx('ui');addP(k.x,k.y,0,0,0.35,5,'rgba(230,240,255,.9)',{grow:16,ring:true,layer:0});}}
   compact(arr,k=>!k.dead);
 }
 function drawKnife(k){
@@ -5469,7 +6473,8 @@ function drawKnife(k){
   ctx.rotate(k.a);
   ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(1,2,8,2.2,0,0,TAU);ctx.fill();
   ctx.strokeStyle='#5a3a1a';ctx.lineWidth=3.2;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-8,0);ctx.lineTo(-3,0);ctx.stroke();
-  ctx.fillStyle='#e6ebf5';ctx.beginPath();ctx.moveTo(-3,-1.8);ctx.lineTo(6,-0.8);ctx.lineTo(9,0);ctx.lineTo(6,1.2);ctx.lineTo(-3,1.8);ctx.closePath();ctx.fill();
+  if(k.kt==='hatchets'){ctx.strokeStyle='#6a4a2a';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-9,0);ctx.lineTo(5,0);ctx.stroke();ctx.fillStyle='#c9ced8';ctx.beginPath();ctx.moveTo(3,-1);ctx.lineTo(8,-6);ctx.lineTo(10,3);ctx.lineTo(3,2);ctx.closePath();ctx.fill();}
+  else{ctx.fillStyle='#e6ebf5';ctx.beginPath();ctx.moveTo(-3,-1.8);ctx.lineTo(6,-0.8);ctx.lineTo(9,0);ctx.lineTo(6,1.2);ctx.lineTo(-3,1.8);ctx.closePath();ctx.fill();}
   ctx.fillStyle='rgba(255,255,255,'+(0.3+0.6*gl).toFixed(3)+')';ctx.fillRect(1,-0.6,4,1);
   ctx.restore();
 }
@@ -5482,15 +6487,41 @@ function drawKnife(k){
     if(P.ship){
       const l=specials(P.ship),cur=(P.ship.sel|0)%Math.max(1,l.length);
       l.forEach((k,i)=>items.push({kind:'spec',idx:i,label:MODINFO[k].n,sub:'ship special',cur:i===cur}));
+      if(P.ship.fac==='pirate'&&!G.deck)items.push({kind:'run',label:'Below deck',sub:'quarters, rum, stash',disabled:!!G.deck,why:'Not now.',run(){typeof enterShipInterior==='function'&&enterShipInterior(P.ship);}});
     }else{
-      for(const k of WORDER){
-        if(!G.owned[k])continue;const w=WEAP[k];
-        const isCur=(w.cat==='melee'?G.melee:G.gun)===k;
-        const sub=w.cat==='melee'?'melee':(w.ammo?(AMMO_NAME[w.ammo]||'ammo').split(' ').slice(-1)[0]+' x'+(G.ammo[w.ammo]|0):'');
-        items.push({kind:'weap',k,label:w.n,sub,cur:isCur});
-      }
+      syncCarry();
+      const hn=k=>k?WEAP[k].n:'empty';
+      items.push({kind:'sub',to:'weap',label:'Weapons',sub:hn(G.carry[0])+' / '+hn(G.carry[1]),cur:false,accent:true});
     }
-    items.push({kind:'sub',label:'Commands',sub:'crew, steed, tonic',cur:false,accent:true});
+    items.push({kind:'sub',to:'items',label:'Items',sub:'rum, tonic, papers',cur:false,accent:true});
+    items.push({kind:'sub',to:'cmd',label:'Crew & steed',sub:'call ships and horse',cur:false,accent:true});
+    return items;
+  }
+  function weapSubItems(){
+    const items=[];syncCarry();
+    [0,1].forEach(h=>{
+      const k=G.carry[h],w=k&&WEAP[k];
+      items.push({kind:'slot',h,label:k?w.n:'Empty hand',sub:(h?'right hand, RMB':'left hand, LMB')+(k&&w.cat!=='melee'?' x'+(G.ammo[w.ammo]|0):''),cur:true});
+    });
+    if(G.carry.length>1)items.push({kind:'run',label:'Swap hands',sub:'LMB and RMB trade places',run(){swapHands(true);}});
+    const st=stashState();
+    items.push({kind:'run',label:'From stash',sub:st.ok?'swap a carried weapon':'steed, ship or chest',disabled:!st.ok,why:st.why,run(){openStash();}});
+    return items;
+  }
+  function itemSubItems(){
+    const items=[];
+    items.push({kind:'run',label:'Inventory',sub:'everything you carry',run(){openInv();}});
+    items.push({kind:'run',label:'Rum x'+(G.items.rum|0),sub:'mild healing, too many = drunk',disabled:(G.items.rum|0)<=0,why:'No rum bottles. Buy them at a tavern.',run(){drinkRum(false);}});
+    items.push({kind:'run',label:'Tonic x'+(G.items.tonic|0),sub:'heals or revives your horse',disabled:!(G.items.tonic>0)||!!G.deck,why:'No tonic left.',run(){useTonic();}});
+    items.push({kind:'run',label:'Ship papers x'+(G.items.papers|0),sub:'claim at a captain\'s desk',disabled:true,why:'Sign for a ship at its captain\'s desk, below deck.',run(){}});
+    return items;
+  }
+  function levelItems(to){
+    return to==='weap'?weapSubItems():to==='items'?itemSubItems():to==='put'?putItems(WHEEL.putH):cmdItems();
+  }
+  function putItems(h){
+    const items=WORDER.filter(k=>isCarryCat(k)&&G.owned[k]&&!G.carry.includes(k)).map(k=>{const w=WEAP[k];return {kind:'putw',h,k,label:w.n,sub:w.cat==='melee'?'melee':'x'+(G.ammo[w.ammo]|0)};});
+    if(!items.length)items.push({kind:'run',label:'Nothing stored',sub:'your stash is empty',disabled:true,why:'Nothing in the stash to swap in.',run(){}});
     return items;
   }
   function cmdItems(){
@@ -5505,7 +6536,6 @@ function drawKnife(k){
     }
     for(const w of G.wrecks)items.push({kind:'run',label:w.name||ST[w.type].name,sub:'wrecked: shipyard',disabled:true,why:'Only a shipyard can raise her.',run(){}});
     if(G.steed){const h=G.steed;items.push({kind:'run',label:h.follow&&!h.down?'Steed: stay':'Call steed',sub:P.ship?'ashore only':h.name,disabled:!!P.ship||!!G.deck,why:'Come ashore first.',run(){whistle();}});}
-    items.push({kind:'run',label:'Tonic x'+(G.items.tonic|0),sub:'heal you or your horse',disabled:!(G.items.tonic>0)||!!G.deck,why:'No tonic left.',run(){useTonic();}});
     return items;
   }
   const geom=()=>{const S=Math.min(VW,VH)*0.88;return {S,cx:S/2,cy:S/2,R:S*0.47,r:S*0.17};};
@@ -5537,10 +6567,10 @@ function drawKnife(k){
     const c=make('circle',{cx:g.cx,cy:g.cy,r:g.r-6,fill:'rgba(8,16,26,.92)',stroke:'#8a6a3a','stroke-width':2},WHEEL.svg);c.style.cursor='pointer';
     c.addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();back();});
     const it=WHEEL.items[WHEEL.sel];
-    const cmd=WHEEL.level==='cmd';
-    const h1=make('text',{x:g.cx,y:g.cy-4,'text-anchor':'middle','font-family':"'Pirata One',Lora,serif",'font-size':Math.max(15,g.S*0.034),fill:'#f4c542'},WHEEL.svg);h1.textContent=it?it.label:(cmd?'Commands':(P0().ship?'Ship special':'Weapons'));h1.style.pointerEvents='none';
+    const lvl=WHEEL.level,LT={weap:'Weapons',items:'Items',cmd:'Crew & steed',put:'Swap in'},cmd=lvl!=='main',thr=false;
+    const h1=make('text',{x:g.cx,y:g.cy-4,'text-anchor':'middle','font-family':"'Pirata One',Lora,serif",'font-size':Math.max(15,g.S*0.034),fill:'#f4c542'},WHEEL.svg);h1.textContent=it?it.label:(cmd?LT[lvl]:(P0().ship?'Ship':'Wheel'));h1.style.pointerEvents='none';
     const h2=make('text',{x:g.cx,y:g.cy+g.S*0.03,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:'#c9b685'},WHEEL.svg);
-    h2.textContent=it?(it.disabled?(it.why||'unavailable'):(WHEEL.sticky?'click or Enter':'release to use')):(WHEEL.sticky?(cmd?'centre: back':'centre: close'):'aim at a slice');h2.style.pointerEvents='none';
+    h2.textContent=it?(it.disabled?(it.why||'unavailable'):(WHEEL.sticky?'click or Enter':'release to use')):(WHEEL.sticky?((cmd||thr)?'centre: back':'centre: close'):'aim at a slice');h2.style.pointerEvents='none';
   }
   function ensure(){
     const stage=document.getElementById('pause').parentNode;
@@ -5551,7 +6581,7 @@ function drawKnife(k){
     root.appendChild(WHEEL.svg);wrap.appendChild(root);stage.appendChild(wrap);WHEEL.root=root;WHEEL.wrap=wrap;
   }
   function open(src,sticky){
-    if(WHEEL.open||G.state!=='play'||G.paused||G.shop||G.dlg||G.bigmap||player.dead)return false;
+    if(WHEEL.open||G.state!=='play'||G.paused||G.shop||G.stashOpen||G.dlg||G.bigmap||player.dead)return false;
     if(G.deck&&G.deck.unarmed){toast('You have no weapons here.','bad');return false;}
     WHEEL.items=weaponItems();WHEEL.level='main';WHEEL.src=src;WHEEL.sticky=!!sticky;WHEEL.open=true;WHEEL.sel=-1;
     mouse.down=false;mouse.rdown=false;
@@ -5571,14 +6601,17 @@ function drawKnife(k){
     const it=WHEEL.items[WHEEL.sel];
     if(!it){if(!WHEEL.sticky)close();return;}
     if(it.disabled){sfx('no');if(it.why)toast(it.why.charAt(0).toUpperCase()+it.why.slice(1),'bad');if(!WHEEL.sticky)close();return;}
-    if(it.kind==='sub'){WHEEL.level='cmd';WHEEL.items=cmdItems();WHEEL.sticky=true;WHEEL.sel=-1;render();sfx('ui');return;}
+    if(it.kind==='slot'){const st=stashState();if(!st.ok){sfx('no');toast(WEAP[G.carry[it.h]]?WEAP[G.carry[it.h]].n+' in your '+(it.h?'right':'left')+' hand. '+st.why.charAt(0).toUpperCase()+st.why.slice(1):st.why,'bad');if(!WHEEL.sticky)close();return;}WHEEL.level='put';WHEEL.putH=it.h;WHEEL.items=putItems(it.h);WHEEL.sticky=true;WHEEL.sel=-1;render();sfx('ui');return;}
+    if(it.kind==='putw'){const c=[G.carry[0]||null,G.carry[1]||null];c[it.h]=it.k;G.carry=c.filter(Boolean);syncCarry();toast(WEAP[it.k].n+' in your '+(it.h?'right':'left')+' hand.','good');sfx('ui');close();return;}
+    if(it.kind==='sub'){WHEEL.level=it.to||'cmd';WHEEL.items=levelItems(WHEEL.level);WHEEL.sticky=true;WHEEL.sel=-1;render();sfx('ui');return;}
     if(it.kind==='spec'){if(player.ship)player.ship.sel=it.idx;}
     else if(it.kind==='weap'){const w=WEAP[it.k];if(w.cat==='melee')G.melee=it.k;else G.gun=it.k;}
     else if(it.kind==='run')it.run();
     sfx('ui');close();
   }
   function back(){
-    if(WHEEL.level==='cmd'){WHEEL.level='main';WHEEL.items=weaponItems();WHEEL.sel=-1;render();sfx('ui');}
+    if(WHEEL.level==='put'){WHEEL.level='weap';WHEEL.items=weapSubItems();WHEEL.sel=-1;render();sfx('ui');}
+    else if(WHEEL.level!=='main'){WHEEL.level='main';WHEEL.items=weaponItems();WHEEL.sel=-1;render();sfx('ui');}
     else if(WHEEL.sticky)close();
   }
   WHEEL.close=close;WHEEL.finish=finish;WHEEL.back=back;WHEEL.open_=open;WHEEL.setSel=setSel;WHEEL.pick=pick;
@@ -5613,7 +6646,7 @@ function drawKnife(k){
     if(sx||sy)setSel(pick(sx,sy,0.01));
     if(WHEEL.sticky){
       if(press(0))finish();
-      else if(press(1)||press(4)){if(WHEEL.level==='cmd')back();else close();}
+      else if(press(1)||press(4)){if(WHEEL.level!=='main')back();else close();}
     }else if(WHEEL.src==='pad'&&!b(4))finish();
     return true;
   };
@@ -5625,7 +6658,7 @@ function drawKnife(k){
       const a=document.createElement('div');a.textContent='Weapon wheel and commands';const b=document.createElement('div');b.innerHTML='Hold <span class="kbd">Tab</span> or middle mouse, move to a slice, release. <b>Commands</b> holds crew, steed and tonic.';ctrl.appendChild(a);ctrl.appendChild(b);
     }
     const ph=document.getElementById('padHelp');if(ph)ph.innerHTML=ph.innerHTML.replace('LB / L1 switch ranged or special','LB / L1 hold opens the weapon wheel (aim with a stick, release to use; pick Commands for crew, steed and tonic)').replace(' &middot; RB / R1 switch melee','');
-    const m=document.querySelector('.tb[data-b="5"]');if(m)m.style.display='none';
+    const m=document.querySelector('.tb[data-b="5"]');if(m)m.textContent='SWAP';
     const sw=document.querySelector('.tb[data-b="4"]');if(sw)sw.textContent='WHEEL';
     const cb=document.getElementById('crewBtn');if(cb)cb.remove();
   }catch(e){}
@@ -5645,7 +6678,7 @@ function drawKnife(k){
 
 function frame(ts){
   let dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;
-  if(WHEEL.open){if(G.state!=='play'||G.paused||G.shop||G.dlg||player.dead)WHEEL.close();else dt*=0.15;}
+  if(WHEEL.open){if(G.state!=='play'||G.paused||G.shop||G.stashOpen||G.dlg||player.dead)WHEEL.close();else dt*=0.15;}
   G.t+=dt;
   debugTick(dt);
   musicUpdate(dt);
@@ -5655,7 +6688,8 @@ function frame(ts){
     cam.x=TDOCK.x+Math.cos(G.t*0.06)*360;cam.y=TDOCK.y-160+Math.sin(G.t*0.06)*220;cam.z=Math.min(1.1,Math.max(0.7,Math.min(VW,VH)/900));
     G.tod=0.38;
     runTimers(dt);updateWorldOnly(dt);
-  }else if(G.state==='play'&&!G.paused&&!G.shop&&!G.dbg){
+  }else if(G.state==='play'&&!G.paused&&!G.shop&&!G.dbg&&!G.stashOpen){
+    drunkTick(dt);
     if(G.dlg){dlgTick(dt);if(!G.deck)updateParts(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);
     storyArrestTick(dt);
   }else if(G.state==='play'&&G.shop){updateParts(dt);}
@@ -5672,7 +6706,7 @@ resize();
 function boot(){
   makeSprites();buildWorld();buildMini();
   player.x=START.x;player.y=START.y;cam.x=START.x;cam.y=START.y;
-  spawnInitial();spawnHorses();makeSteed();
+  spawnInitial();spawnHorses();buildCorrals();makeSteed();
   const sv=readSave();G.hasSave=!!sv;
   if(sv){
     $('contBtn').classList.remove('hidden');$('delBtn').classList.remove('hidden');
@@ -5681,7 +6715,8 @@ function boot(){
   }else $('startBtn').textContent='Set Sail';
   $('startBtn').disabled=false;
   G.ready=true;
-  window.__bb={STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,WHEEL,knifeDrops,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
+  {const ps=$('pressStart');if(ps){ps.textContent='Press Start';ps.classList.remove('wait');}}
+  window.__bb={townAnger,startFight,FIGHT_TOWNS,CORRALS,critters,cleanSweep,sweepIdleShips,sweepPeople,ships,people,mkShip,decor,MW,WHEEL,WW,WH,PIERS,callSpot,summonTo,crewCall,islandPier,drinkRum,drunkTick,isDrunk,claimShip,openInv,fleetCount,registerShip,enterInterior,enterShipInterior,openWard,intSleep,intEat,genInterior,acquireWeapon,swapHands,handWeapon,handUse,syncCarry,openStash,closeStash,stashState,fires,bombs,thrownOwned,STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,WHEEL,knifeDrops,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
   requestAnimationFrame(frame);
 }
 setTimeout(boot,40);
