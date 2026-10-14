@@ -13,3 +13,6 @@ This repo is served by GitHub Pages: Settings > Pages > Deploy from a branch > `
 Replace `index.html` with the new `blackwater-bay.html`, bump `VERSION` in `sw.js` (e.g. `bb-v2`), and push. Installed copies update on their next launch (they may need one extra relaunch).
 
 Saves live in each device's browser storage (they are not shared between devices).
+
+## Change log
+See [CHANGELOG.md](CHANGELOG.md). It matches the in-game list under Options > Change log and is updated with every release.
