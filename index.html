@@ -706,9 +706,9 @@ function spawnInitial(){
   moor('brig','navy',CPIER.px-2.3,CPIER.wy+3,-PI/2);
   moor('galleon','merchant',CPIER.px+4,CPIER.wy+4,-PI/2);
   moor('brig','navy',FPIER.px-2.3,FPIER.wy+2.5,-PI/2);
-  for(let i=0;i<12;i++)spawnSea('merchant');
-  for(let i=0;i<5;i++)spawnSea('navy');
-  for(let i=0;i<5;i++)spawnSea('raider');
+  for(let i=0;i<SEA_N.merchant;i++)spawnSea('merchant');
+  for(let i=0;i<SEA_N.navy;i++)spawnSea('navy');
+  for(let i=0;i<SEA_N.raider;i++)spawnSea('raider');
   for(const T of TOWNS){
     if(T.law){
       for(let i=0;i<14;i++){const q=randTownPos(T);mkFolk('civ',q.x,q.y,{town:T.id,law:true});}
@@ -790,6 +790,7 @@ function sinkShip(s,byPlayer){
   let n=0,lo=0,hi=0;
   if(s.fac==='merchant'){n=3;lo=30;hi=70;}else if(s.fac==='raider'){n=2;lo=40;hi=90;}else if(s.fac==='navy'){n=2;lo=20;hi=60;if(s.boss){n=6;lo=90;hi=180;}}
   for(let i=0;i<n;i++)pickups.push({type:'loot',x:s.x+rr(-24,24),y:s.y+rr(-24,24),val:ri(lo,hi),t:0,rot:rr(0,TAU)});
+  {const nw=Math.min(4,1+Math.floor(ST[s.type].L/70))+ri(0,1);for(let i=0;i<nw;i++)pickups.push({type:'wood',x:s.x+rr(-30,30),y:s.y+rr(-30,30),val:ri(1,3),t:0,rot:rr(0,TAU)});}
   if(byPlayer&&s.fac==='navy')addHeat(s.boss?10:26);
   if(byPlayer){G.kills++;if(mission&&mission.def.onSink)mission.def.onSink(mission,s);}
 }
@@ -923,7 +924,7 @@ function nearHull(s){
   if(P.ship)return dist(s.x,s.y,P.x,P.y)<(ST[s.type].L+ST[P.ship.type].L)*0.42+16;
   return shipHit(s,P.x,P.y,36);
 }
-function startHijack(s){G.board={s,t:0,need:s.fac==='merchant'?1.8:2.6};toast('Climbing aboard the '+ST[s.type].name+'. Keep holding E!');sfx('ui');}
+function startHijack(s){G.board={s,t:0,need:s.fac==='merchant'?1.8:2.6};toast('Climbing aboard the '+ST[s.type].name+'. Stay alongside until the hooks bite.');sfx('ui');}
 function completeHijack(s){
   G.board=null;
   const wasM=s.fac==='merchant',wasR=s.fac==='raider';
@@ -932,6 +933,7 @@ function completeHijack(s){
   else if(wasR){const g=ri(60,130);gainGold(g);toast('Hijacked a rival raider! +'+g+' gold','good');}
   else toast('Hijacked a Navy ship!','bad');
   sparks(s.x,s.y,16,'#ffd75a');sfx('coin');
+  if(mission&&mission.def.onHijack)mission.def.onHijack(mission,s);
 }
 function dockSpot(type,pier,skip){
   const st=ST[type];
@@ -954,20 +956,73 @@ function leaveShip(){
   }
   P.x=s.x-Math.sin(s.a)*40;P.y=s.y+Math.cos(s.a)*40;
 }
+const LUMBER_MAX=99;
+function addLumber(n){const had=G.items.lumber|0;G.items.lumber=Math.min(LUMBER_MAX,had+n);return G.items.lumber-had;}
+// Trees take a number of hits that depends on the weapon: axes and hatchets are quick, blades slower, fists very slow.
+const TREE_HP=100,treeHP=new Map();
+const CHOP_POW=W=>{const d=W.dmg||9;return W===WEAP.axe||W===WEAP.hatchetM?d:W===WEAP.cutlass?d:W===WEAP.fists?d*0.35:d*0.5;};
+function treeInSwing(W){
+  const P=player,reach=W.reach+(P.horse?10:0)+16;let bi=-1,bd=1e9;
+  const tx0=Math.floor(P.x/TS),ty0=Math.floor(P.y/TS);
+  for(let ty=ty0-2;ty<=ty0+2;ty++)for(let tx=tx0-2;tx<=tx0+2;tx++){
+    const i=ty*MW+tx;if(!(decor[i]>=9))continue;
+    const cx=(tx+0.5)*TS,cy=(ty+0.5)*TS,d=dist(cx,cy,P.x,P.y);
+    if(d>reach||d>=bd)continue;
+    if(d>20&&Math.abs(angDiff(Math.atan2(cy-P.y,cx-P.x),P.a))>Math.max(W.arc,0.9))continue;
+    bd=d;bi=i;
+  }
+  return bi;
+}
+function hitTree(i,W){
+  if(!(decor[i]>=9))return;
+  const x=(i%MW+0.5)*TS,y=(Math.floor(i/MW)+0.5)*TS;
+  const e=treeHP.get(i)||{hp:TREE_HP,t:0};e.hp-=CHOP_POW(W);e.t=0;treeHP.set(i,e);
+  sfx('hit',x,y);for(let k=0;k<5;k++)addP(x+rr(-8,8),y+rr(-8,8),rr(-50,50),rr(-60,-10),0.45,2.5,'#6b8a3c');
+  if(e.hp>0)return;
+  treeHP.delete(i);
+  G.stumps=G.stumps||[];G.stumps.push({i,d:decor[i],t:(G.worldDay||0)+1});decor[i]=5;
+  const n=ri(2,4),got=addLumber(n);
+  for(let k=0;k<10;k++)addP(x+rr(-10,10),y+rr(-10,10),rr(-70,70),rr(-80,-10),0.6,3,'#9a7a4a');
+  G.shake=Math.max(G.shake,2);
+  toast(got>0?'The tree falls. +'+got+' lumber':'Your lumber is full ('+LUMBER_MAX+').',got>0?'good':'bad');
+}
+function treeTick(dt){for(const [i,e] of treeHP){e.t+=dt;if(e.t>12)treeHP.delete(i);}}
+function drawTreeBars(TKr){
+  for(const [i,e] of treeHP){
+    const x=(i%MW+0.5)*TS,y=(Math.floor(i/MW)+0.5)*TS;
+    const dr=()=>{const w=34,f=Math.max(0,e.hp/TREE_HP);ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillRect(-w/2-1,-40,w+2,7);ctx.fillStyle=f>0.5?'#7ab648':f>0.25?'#e0b13a':'#c0372c';ctx.fillRect(-w/2,-39,w*f,5);};
+    if(TKr<1)upr(x,y,dr);else{ctx.save();ctx.translate(x,y);dr();ctx.restore();}
+  }
+}
+function rideToggle(){
+  const P=player;if(G.deck||P.dead||G.shop)return false;
+  if(G.taming)return true;
+  if(P.ship){
+    if(G.board)return true;
+    let t=null,bd=1e9;
+    for(const q of ships){if(q.dead||q.crew!=='ai'||q.boss||!nearHull(q))continue;if(!(q.fac==='merchant'||q.hp<=q.maxhp*0.6))continue;const d=dist(q.x,q.y,P.x,P.y);if(d<bd){bd=d;t=q;}}
+    if(t){startHijack(t);return true;}
+    leaveShip();return true;
+  }
+  if(P.horse){dismount();return true;}
+  let best=null,bd=1e9,hz=null;
+  for(const h of horses){if(h.down)continue;const d=dist(h.x,h.y,P.x,P.y);if(d<54&&d<bd){bd=d;best=()=>mountHorse(h);}}
+  for(const q of ships){if(q.dead||q.crew)continue;const d=dist(q.x,q.y,P.x,P.y);if(d<62+ST[q.type].L*0.3&&d<bd){bd=d;best=()=>boardShip(q);}}
+  if(!best)return false;best();return true;
+}
 function pickInteract(){
   const P=player;let best=null;
   const consider=c=>{if(!best||c.pri>best.pri||(c.pri===best.pri&&c.d<best.d))best=c;};
-  if(G.board)return {pri:9,d:0,label:'Boarding... '+Math.round(100*G.board.t/G.board.need)+'% (keep holding E)',use(){}};
+  if(G.board)return {pri:9,d:0,label:'Boarding... '+Math.round(100*G.board.t/G.board.need)+'%',use(){}};
   if(mission&&mission.def.interact){const c=mission.def.interact(mission);if(c)consider({pri:3,d:0,label:c.label,use:c.use});}
   if(G.npc){const d=dist(P.x,P.y,G.npc.x,G.npc.y);if(d<70)consider({pri:3,d,label:'Talk to '+G.npc.name,use:()=>G.npc.talk()});}
   for(const z of zones){const d=dist(P.x,P.y,z.x,z.y);if(d<z.r)consider({pri:z.kind==='shipyard'?1.5:2,d,label:z.prompt,use:()=>zoneUse(z)});}
-  if(P.ship)consider({pri:1,d:0,label:'Leave ship',use:leaveShip});
-  if(G.taming)return {pri:9,d:0,label:'Calming the horse... '+Math.round(100*G.taming.t/G.taming.need)+'% (keep holding E)',use(){}};
+  if(G.taming)return {pri:9,d:0,label:'Calming the horse... '+Math.round(100*G.taming.t/G.taming.need)+'% (keep holding '+padKey('D')+')',use(){}};
   if(P.horse)consider({pri:1.2,d:0,label:'Dismount',use:()=>dismount()});
   else if(!P.ship)for(const h of horses){
     const d=dist(h.x,h.y,P.x,P.y);if(d>=54)continue;
     if(h.down){if(h.mine)consider({pri:2.1,d,label:G.items.tonic>0?'Revive '+h.name+' with a tonic ('+G.items.tonic+' left)':h.name+' is down. Needs a horse tonic from a stable.',use:()=>useTonic()});continue;}
-    consider({pri:h.mine?(h.callT>0?2.2:1.65):1.6,d,label:h.mine?'Mount '+h.name+' (your steed)':(h.dbg?'Mount the Debug Steed (x50 speed)':h.wild?'Gentle the wild '+BREEDS[h.breed].n+' (hold E)':'Mount the horse'),use:()=>mountHorse(h)});
+    consider({pri:h.mine?(h.callT>0?2.2:1.65):1.6,d,label:h.mine?'Mount '+h.name+' (your steed)':(h.dbg?'Mount the Debug Steed (x50 speed)':h.wild?'Gentle the wild '+BREEDS[h.breed].n+' (hold '+padKey('D')+')':'Mount the horse'),use:()=>mountHorse(h)});
   }
   for(const q of ships){
     if(q.dead||q===P.ship)continue;
@@ -975,14 +1030,27 @@ function pickInteract(){
     if(q.crew==='ai'&&!q.boss){
       if(!nearHull(q))continue;
       const ok=q.fac==='merchant'||q.hp<=q.maxhp*0.6;
-      consider({pri:1.8,d,label:ok?'Board the '+ST[q.type].name+' (hold E)':'Her crew is too strong. Batter her hull below 60% first',use:ok?()=>startHijack(q):()=>toast('Shoot her hull below 60% first, then board.','bad')});
+      consider({fy:1,pri:1.8,d,label:ok?'Board the '+ST[q.type].name+' (press '+padKey('D')+')':'Her crew is too strong. Batter her hull below 60% first',use:ok?()=>startHijack(q):()=>toast('Shoot her hull below 60% first, then board.','bad')});
     }else if(!q.crew&&d<62+ST[q.type].L*0.3){
-      consider({pri:1.7,d,label:'Board the '+(q.own?q.name:ST[q.type].name)+(q.fac==='navy'?' (Navy property)':(q.conq&&!q.own?' (your prize, no papers)':'')),use:()=>boardShip(q)});
+      consider({fy:1,pri:1.7,d,label:'Board the '+(q.own?q.name:ST[q.type].name)+(q.fac==='navy'?' (Navy property)':(q.conq&&!q.own?' (your prize, no papers)':'')),use:()=>boardShip(q)});
     }
   }
   return best;
 }
 
+/* walk-in doors, like the old handheld RPGs: step onto a door to enter, step onto an exit to leave */
+const WALK_DOORS=['tavern','stable','armory','governor','shipyard','registry','throne','cave'];
+function doorWalk(){
+  const P=player;
+  if(G.state!=='play'||G.paused||G.deck||G.dlg||G.shop||G.dbg||G.stashOpen||G.arrest||G.board||G.taming||P.dead||P.ship)return;
+  for(const z of zones){
+    if(!WALK_DOORS.includes(z.kind))continue;
+    const d=dist(P.x,P.y,z.x,z.y);
+    if(z.armed===undefined||d>54){z.armed=d>54;if(d>54)z.armed=true;}
+    if(d>54)continue;
+    if(z.armed&&d<30){z.armed=false;zoneUse(z);return;}
+  }
+}
 /* ================= shops ================= */
 const shopEl=$('shop');
 function openShop(z){
@@ -992,13 +1060,15 @@ function openShop(z){
 function closeShop(){G.shop=null;G.shopPage='main';G.shopCat=null;shopEl.classList.add('hidden');}
 function shopItems(z){
   const P=player,items=[];
+  if(z.kind==='contracts')return contractItems(z);
+  if(z.kind==='desk')return deskItems(z);
   if(z.kind==='tavern'){
     items.push({sec:'Food and drink',t:'Tankard of rum',d:'Restores your health to full.',c:z.law?40:25,ok:()=>P.hp<P.maxhp,run(){P.hp=P.maxhp;toast('Ahh. Health restored.','good');}});
-    items.push({t:'Bottle of rum ('+(G.items.rum|0)+'/6)',d:'Mild healing. Drink it from your inventory (I). Drink too many and ye will be drunk.',c:12,ok:()=>(G.items.rum|0)<6,run(){G.items.rum=(G.items.rum|0)+1;}});
+    items.push({t:'Bottle of rum ('+(G.items.rum|0)+'/6)',d:'Mild healing. Drink it from the weapon wheel. Drink too many and ye will be drunk.',c:12,ok:()=>(G.items.rum|0)<6,run(){G.items.rum=(G.items.rum|0)+1;}});
     items.push({sec:'Supplies',t:'Powder and shot (x12)',d:'Ammunition for pistols and muskets. Carry up to 60.',c:20,ok:()=>G.ammo.shot<AMMO_MAX.shot,run(){G.ammo.shot=Math.min(AMMO_MAX.shot,G.ammo.shot+12);}});
     if(!z.law){
       items.push({sec:'Services',t:'Bribe the Navy',d:'Makes your notoriety disappear.',c:120,ok:()=>G.heat>0,run(){clearHeat('The Navy has been persuaded.');}});
-      items.push({t:mission?'Current job: '+mission.def.title:'Ask about work',d:mission?'Finish what ye started first.':'Captain Flint always has a job.',c:0,ok:()=>!mission,run(){closeShop();startMission(G.done);}});
+      if(!ONLINE)items.push({t:mission?'Current job: '+mission.def.title:'Ask about work',d:mission?'Finish what ye started first.':'Captain Flint always has a job.',c:0,ok:()=>!mission,run(){closeShop();startMission(G.done);}});
     }
   }else if(z.kind==='shipyard'){
     if(G.shopPage==='fleet'){fleetItems(z,items);return items;}
@@ -1027,7 +1097,7 @@ function shopItems(z){
   }else if(z.kind==='registry'){
     const fc=fleetCount();
     items.push({t:'Fleet registered: '+fc+' / 3',d:fc>=3?'Your fleet is full. Sell a ship at the shipyard first.':'Papers in your name unlock level 2 fittings at the shipyard.',c:0,lbl:'\u2014',ok:()=>false,run(){}});
-    items.push({t:'Ship papers ('+(G.items.papers|0)+' held)',d:'One set claims one ship. Sail the prize home, go below deck, and sign at the captain\'s desk. Open your inventory with I.',c:150,ok:()=>(G.items.papers|0)<5,run(){G.items.papers=(G.items.papers|0)+1;toast('Ship papers added to your inventory.','good');}});
+    items.push({t:'Ship papers ('+(G.items.papers|0)+' held)',d:'One set claims one ship. Sail the prize home, go below deck, and sign at the captain\'s desk. Open your inventory from the weapon wheel.',c:300,ok:()=>(G.items.papers|0)<5,run(){G.items.papers=(G.items.papers|0)+1;toast('Ship papers added to your inventory.','good');}});
   }else if(z.kind==='governor'){
     const st3=stars(),chance=clamp(0.4+G.done*0.07+(P.hp/P.maxhp)*0.1,0.4,0.85);
     items.push({t:'Offer a generous "donation"',d:'Buys a royal pardon. All charges dropped.',c:200+Math.max(1,st3)*120,ok:()=>G.heat>0,run(){clearHeat('The Governor signs yer pardon with a very forced smile.');}});
@@ -1042,6 +1112,7 @@ function shopItems(z){
     let curSec='';
     const wi=(k,c,d,extra)=>({sec:curSec,t:WEAP[k].n,d:own(k)?'Owned. Equip it from the weapon wheel (Tab).':d,c:own(k)?0:c,lbl:own(k)?'Owned':undefined,ok:()=>!own(k),run(){acquireWeapon(k);if(extra)extra();}});
     curSec='Melee weapons';
+    if(G.tut&&G.tut.s===2&&mission&&mission.def.tut&&mission.stage===0&&!own('cutlass'))items.push({sec:curSec,t:'Recruit\'s Cutlass',d:'A plain blade for new recruits. Cheap.',c:10,ok:()=>!own('cutlass'),run(){acquireWeapon('cutlass');}});
     items.push(wi('rapier',130,'Fast and long reach, but light damage.'));
     items.push(wi('axe',170,'Slow and brutal. Wide swing, heavy knockback.'));
     curSec='Firearms';
@@ -1065,8 +1136,8 @@ function shopItems(z){
   }
   if(z.kind==='stable'){
     const h=G.steed,near=!!h&&dist(h.x,h.y,P.x,P.y)<500,total=(h?1:0)+G.stable.length,nxt=G.stable[0];
-    items.push({sec:'Care',t:'Feed & groom',d:!h?'You have no steed.':near?(h.down?'Nurse '+h.name+' back on its feet.':'Heal and rest '+h.name+'. Deepens your bond.'):'Bring '+h.name+' here first (press H).',c:h&&h.down?90:40,ok:()=>near,run(){const st=steedStats(h);h.down=false;h.hp=st.hp;h.stam=st.stam;h.winded=false;addBond(h,40);toast(h.name+' looks glorious.','good');}});
-    items.push({t:'Horse tonic ('+G.items.tonic+'/5)',d:'Heals or revives your steed. Press V to use.',c:50,ok:()=>G.items.tonic<5,run(){G.items.tonic++;}});
+    items.push({sec:'Care',t:'Feed & groom',d:!h?'You have no steed.':near?(h.down?'Nurse '+h.name+' back on its feet.':'Heal and rest '+h.name+'. Deepens your bond.'):'Bring '+h.name+' here first (press Q).',c:h&&h.down?90:40,ok:()=>near,run(){const st=steedStats(h);h.down=false;h.hp=st.hp;h.stam=st.stam;h.winded=false;addBond(h,40);toast(h.name+' looks glorious.','good');}});
+    items.push({t:'Horse tonic ('+G.items.tonic+'/5)',d:'Heals or revives your steed. Use it from the weapon wheel.',c:50,ok:()=>G.items.tonic<5,run(){G.items.tonic++;}});
     for(const key of ['arabian','destrier','phantom']){
       const B=BREEDS[key];
       items.push({sec:'Horses for sale',t:'Buy '+(/^[AEIOU]/.test(B.n)?'an ':'a ')+B.n,d:'Speed '+B.speed+', stamina '+B.stam+', health '+B.hp+'. '+(total>=4?'Your stable is full.':'Your current steed moves to the stable.'),c:B.price,ok:()=>total<4,run(){buySteed(key);}});
@@ -1079,7 +1150,7 @@ function shopItems(z){
 function renderShop(){
   const z=G.shop;if(!z)return;
   $('shopTitle').textContent=z.name;
-  $('shopSub').textContent=z.kind==='tavern'?(z.law?'A respectable establishment. Keep yer cutlass sheathed.':'Smoke, rum, and men who owe each other money.'):z.kind==='stable'?'Hay, leather, and the occasional kick.':z.kind==='armory'?'Steel, powder and fuses. Mind the sparks.':z.kind==='fence'?'A driftwood shack, a lantern, and a man who never asks where it came from.':z.kind==='registry'?'Ink, wax seals, and a clerk who asks no questions.':z.kind==='governor'?'A powdered wig, a trembling hand, and a very large desk.':'Smell o\' tar and fresh timber.';
+  $('shopSub').textContent=z.kind==='contracts'?(ONLINE&&!G.opening?'Welcome aboard, Captain. Take this first contract to learn how the work goes.':'Privateer work. Sink them or take them. Pay is on delivery.'):z.kind==='tavern'?(z.law?'A respectable establishment. Keep yer cutlass sheathed.':'Smoke, rum, and men who owe each other money.'):z.kind==='stable'?'Hay, leather, and the occasional kick.':z.kind==='armory'?'Steel, powder and fuses. Mind the sparks.':z.kind==='fence'?'A driftwood shack, a lantern, and a man who never asks where it came from.':z.kind==='registry'?'Ink, wax seals, and a clerk who asks no questions.':z.kind==='governor'?'A powdered wig, a trembling hand, and a very large desk.':'Smell o\' tar and fresh timber.';
   const items=shopItems(z);const box=$('shopItems');box.innerHTML='';
   let cs=null;items.forEach(it=>{if(it.sec)cs=it.sec;else if(cs)it.sec=cs;});
   const secs=[];items.forEach(it=>{if(it.sec&&!secs.includes(it.sec))secs.push(it.sec);});
@@ -1326,7 +1397,7 @@ function fightCiv(p,dt){
 function updCiv(p,dt){
   const P=player;
   if(p.despawn&&dist(p.x,p.y,P.x,P.y)>450){p.dead=true;return;}
-  if(G.fight&&G.fight.id===p.town&&!P.dead&&G.state==='play'&&dist(p.x,p.y,P.x,P.y)<900){if(!p.fightMode)p.fightMode=rand()<0.35?'shoot':'melee';fightCiv(p,dt);return;}
+  if(((G.fight&&G.fight.id===p.town)||(p.town&&FIGHT_TOWNS[p.town]&&inContract()&&dist(p.x,p.y,P.x,P.y)<520))&&!P.dead&&G.state==='play'&&dist(p.x,p.y,P.x,P.y)<900){if(!p.fightMode)p.fightMode=rand()<0.35?'shoot':'melee';fightCiv(p,dt);return;}
   if(p.flee>0){p.flee-=dt;const a=Math.atan2(p.y-P.y,p.x-P.x)+p.fa;p.a=turnToward(p.a,a,8,dt);moveDir(p,a,108,dt);p.walk+=dt*2.2;return;}
   if(p.wt>0){p.wt-=dt;return;}
   const d=dist(p.x,p.y,p.tx,p.ty);
@@ -1426,8 +1497,10 @@ function updateBalls(dt){
     if(t>=8){cannonImpact(b);b.dead=true;continue;}
     // ships
     for(const s of ships){
-      if(s.dead||s===b.own||s.fac===b.fac)continue;
-      if(b.fac==='navy'&&s.fac==='navy')continue;
+      if(s.dead||s===b.own)continue;
+      const idle=!s.crew&&!s.own&&!s.keep;
+      if(s.fac===b.fac&&!idle)continue;
+      if(b.fac==='navy'&&s.fac==='navy'&&!idle)continue;
       if(shipHit(s,b.x,b.y,4)){damageShip(s,b.dmg,b.fac,b.byPlayer);explodeFx(b.x,b.y,8);sfx('hit',b.x,b.y);b.dead=true;break;}
     }
     if(b.dead)continue;
@@ -1488,10 +1561,12 @@ function updatePickups(dt){
   const R=P.ship?48:26;
   for(const k of pickups){
     k.t+=dt;
+    if(k.type==='wood'){k.x+=Math.sin(k.t*0.8+k.val)*5*dt;k.y+=Math.cos(k.t*0.7+k.val)*5*dt;if(k.t>150)k.dead=true;}
     if(k.type==='loot'){k.x+=Math.sin(k.t*0.8+k.val)*6*dt;k.y+=Math.cos(k.t*0.7+k.val)*6*dt;if(k.t>90)k.dead=true;}
     if(dist(k.x,k.y,P.x,P.y)<R){
       if(k.type==='gold'){gainGold(k.val);sfx('coin');k.dead=true;}
-      else if(k.type==='chest'){if(k.id!==undefined)G.chestsTaken.push(k.id);gainGold(k.val);sfx('coin');toast('Treasure chest! +'+k.val+' gold','good');sparks(k.x,k.y,12,'#ffd75a');k.dead=true;}
+      else if(k.type==='chest'){if(k.id!==undefined)G.chestsTaken.push(k.id);gainGold(k.val);sfx('coin');{const lw=rand()<0.65?addLumber(ri(2,5)):0;toast('Treasure chest! +'+k.val+' gold'+(lw?' and '+lw+' lumber':''),'good');}sparks(k.x,k.y,12,'#ffd75a');k.dead=true;}
+      else if(k.type==='wood'){const g=addLumber(k.val);if(g>0){sfx('ui');toast('Salvaged planks. +'+g+' lumber','good');k.dead=true;}}
       else if(k.type==='loot'){gainGold(k.val);sfx('coin');toast('Salvaged cargo +'+k.val+' gold','good');k.dead=true;}
       else if(k.type==='ammo'){const ak=k.ak||'shot';G.ammo[ak]=Math.min(AMMO_MAX[ak],(G.ammo[ak]||0)+k.val);sfx('ui');k.dead=true;}
       else if(k.type==='rum'){if(P.hp<P.maxhp){P.hp=Math.min(P.maxhp,P.hp+k.val);sfx('ui');toast('Rum! +'+k.val+' health','good');k.dead=true;}}
@@ -1511,10 +1586,12 @@ function swingMelee(){
   later(W.swing*0.35,()=>{
     if(P.dead)return;
     const reach=W.reach+(P.horse?10:0);
+    let hitAny=false;
     for(const p of people){
       if(p.dead)continue;const d=dist(p.x,p.y,P.x,P.y);
-      if(d<reach&&Math.abs(angDiff(Math.atan2(p.y-P.y,p.x-P.x),P.a))<W.arc){hurtPerson(p,W.dmg,P.a,true);if(W.knock){p.kx+=Math.cos(P.a)*W.knock;p.ky+=Math.sin(P.a)*W.knock;}}
+      if(d<reach&&Math.abs(angDiff(Math.atan2(p.y-P.y,p.x-P.x),P.a))<W.arc){hitAny=true;hurtPerson(p,W.dmg,P.a,true);if(W.knock){p.kx+=Math.cos(P.a)*W.knock;p.ky+=Math.sin(P.a)*W.knock;}}
     }
+    if(!hitAny&&!P.ship&&!G.deck){const ti=treeInSwing(W);if(ti>=0)hitTree(ti,W);}
   });
 }
 function fireGun(){
@@ -1582,7 +1659,7 @@ function swapHands(fromWheel){
   syncCarry();if(G.carry.length<2){toast('You only carry one weapon.');return;}
   G.carry.reverse();sfx('ui');toast('Hands swapped. LMB: '+WEAP[G.carry[0]].n+'   RMB: '+WEAP[G.carry[1]].n);
 }
-/* slot 0 = left hand (LMB / Space), slot 1 = right hand (RMB / F). Out of throwables? knives and hatchets are swung, everything else is a punch. */
+/* slot 0 = left hand (LMB), slot 1 = right hand (RMB). Out of throwables? knives and hatchets are swung, everything else is a punch. */
 function handWeapon(h){
   const k=G.carry[h];
   if(!k)return {k:'fists',mode:'melee'};
@@ -1611,7 +1688,7 @@ function handLabel(h){
   return w.n+' &times;'+(G.ammo[w.ammo]||0);
 }
 /* ---- stash screen ---- */
-let stashOv=null;
+let stashOv=null,stashSec=null;
 function stashEl(){
   if(stashOv)return stashOv;
   const ov=document.createElement('div');ov.id='stashOv';ov.className='overlay hidden';ov.style.zIndex=60;
@@ -1622,8 +1699,8 @@ function buildStash(){
   const ov=stashEl(),card=ov.firstChild;card.innerHTML='';
   const mk=(tag,txt,st)=>{const e=document.createElement(tag);if(txt)e.textContent=txt;if(st)e.style.cssText=st;card.appendChild(e);return e;};
   mk('h2','Weapon stash','font-size:32px');
-  mk('p','You carry two weapons. Everything else stays here. Throwables are always on you.','font-size:14px;margin:0 0 8px');
-  const btn=(txt,fn,parent)=>{const b=document.createElement('button');b.className='btn ghost';b.style.cssText='display:inline-block;width:auto;margin:3px 4px;padding:6px 12px;font-size:15px';b.textContent=txt;b.addEventListener('click',()=>{b.blur();fn();buildStash();});parent.appendChild(b);return b;};
+  mk('p','You carry two weapons, melee, ranged or thrown. Everything else stays here.','font-size:14px;margin:0 0 8px');
+  const btn=(txt,fn,parent)=>{const b=document.createElement('button');b.className='btn ghost';b.style.cssText='display:inline-block;width:auto;margin:3px 4px;padding:6px 12px;font-size:15px';b.textContent=txt;b.addEventListener('click',()=>{b.blur();fn();pad.mi=0;buildStash();});parent.appendChild(b);return b;};
   const row=(label,sub)=>{const r=document.createElement('div');r.style.cssText='display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;border:1px solid rgba(80,50,20,.45);border-radius:8px;padding:6px 10px;margin:6px 0;background:rgba(255,248,225,.55)';
     const l=document.createElement('div');l.style.cssText='text-align:left';l.innerHTML='<b>'+label+'</b>'+(sub?'<div style="font-size:12px;opacity:.75">'+sub+'</div>':'');r.appendChild(l);const bx=document.createElement('div');r.appendChild(bx);card.appendChild(r);return bx;};
   syncCarry();
@@ -1635,13 +1712,24 @@ function buildStash(){
     btn('Stash it',()=>{G.carry.splice(i,1);syncCarry();sfx('ui');},bx);
   }
   const stored=WORDER.filter(k=>isCarryCat(k)&&G.owned[k]&&!G.carry.includes(k));
-  mk('h3','Stored','margin:12px 0 0;font-size:18px');
-  if(!stored.length)mk('p','Nothing stored.','font-size:14px;margin:4px 0');
-  for(const k of stored){
-    const w=WEAP[k],bx=row(w.n,w.cat==='melee'?'melee':(AMMO_NAME[w.ammo]||'')+' x'+(G.ammo[w.ammo]|0));
-    const take=i=>{if(i>=0){const old=G.carry[i];G.carry[i]=k;}else G.carry.push(k);if(w.cat==='melee')G.melee=k;else G.gun=k;syncCarry();sfx('ui');};
-    if(G.carry.length<2)btn('Carry',()=>take(-1),bx);
-    else G.carry.forEach((c,i)=>btn('Swap for '+WEAP[c].n,()=>take(i),bx));
+  const thrown=stored.filter(k=>WEAP[k].cat==='thrown');
+  const TYPES=[['Blades',stored.filter(k=>WEAP[k].cat==='melee')],['Pistols',stored.filter(k=>k==='pistol'||k==='duel')],['Long guns',stored.filter(k=>WEAP[k].cat==='gun'&&k!=='pistol'&&k!=='duel')],['Thrown',thrown]].filter(t=>t[1].length);
+  if(stashSec&&!TYPES.some(t=>t[0]===stashSec))stashSec=null;
+  const hdBtn=(txt,right,fn)=>{const hd=document.createElement('button');hd.className='btn ghost';hd.style.cssText='display:flex;justify-content:space-between;width:100%;margin:6px 0 0;padding:8px 12px;font-size:16px';hd.innerHTML='<b></b><span></span>';hd.firstChild.textContent=txt;hd.lastChild.textContent=right;hd.addEventListener('click',()=>{hd.blur();sfx('ui');fn();pad.mi=0;buildStash();const bx=stashEl().firstChild;if(bx)bx.scrollTop=0;});card.appendChild(hd);};
+  if(!stashSec){
+    mk('h3','Stored ('+TYPES.reduce((n,t)=>n+t[1].length,0)+')','margin:12px 0 0;font-size:18px');
+    if(!TYPES.length)mk('p','Nothing stored.','font-size:14px;margin:4px 0');
+    for(const [tn,list] of TYPES)hdBtn(tn,list.length+' \u203a',()=>{stashSec=tn;});
+  }else{
+    const cur=TYPES.find(t=>t[0]===stashSec);
+    hdBtn('\u2039 '+stashSec,'Back',()=>{stashSec=null;});
+    for(const k of cur[1]){
+      const w=WEAP[k];
+      const bx=row(w.n,(w.cat==='melee'?'Melee':(AMMO_NAME[w.ammo]||'')+' x'+(G.ammo[w.ammo]|0))+(w.dmg?' \u00b7 '+Math.round(w.dmg*(w.pellets||1))+' damage':w.cat==='thrown'?' \u00b7 thrown, explodes or burns':''));
+      const take=i=>{if(i>=0){G.carry[i]=k;}else G.carry.push(k);if(w.cat==='melee')G.melee=k;else G.gun=k;syncCarry();sfx('ui');};
+      if(G.carry.length<2)btn('Carry',()=>take(-1),bx);
+      else G.carry.forEach((c,i)=>btn('Swap for '+WEAP[c].n,()=>take(i),bx));
+    }
   }
   const cl=document.createElement('button');cl.className='btn';cl.style.cssText='display:block;width:100%;margin-top:12px';cl.textContent='Done';cl.addEventListener('click',()=>{cl.blur();closeStash();});card.appendChild(cl);
 }
@@ -1650,6 +1738,7 @@ function openStash(){
   if(WHEEL.close)WHEEL.close();
   G.stashOpen=true;mouse.down=false;mouse.rdown=false;
   buildStash();stashEl().classList.remove('hidden');
+  if(mission&&mission.def.onStash)mission.def.onStash(mission);
 }
 function closeStash(){G.stashOpen=false;if(stashOv)stashOv.classList.add('hidden');if(wardOv)wardOv.classList.add('hidden');if(invOv)invOv.classList.add('hidden');if(G.deck)G.deck.stash=false;}
 /* ---- thrown effects: rum bottles shatter, molotovs burn, grenados blow ---- */
@@ -1785,7 +1874,7 @@ function useTonic(){
 }
 function doTaming(dt){
   const P=player,tm=G.taming,h=tm.h;
-  if(keys.KeyE){tm.t+=dt;tm.slip=Math.max(0,tm.slip-dt*0.5);}else tm.slip+=dt;
+  if(keys.KeyE||keys.KeyF){tm.t+=dt;tm.slip=Math.max(0,tm.slip-dt*0.5);}else tm.slip+=dt;
   G.shake=Math.max(G.shake,2.6);
   P.hvx=Math.sin(G.t*18)*70;P.hvy=Math.cos(G.t*15)*70;
   moveFolk(P,P.hvx*dt,P.hvy*dt,9,2);
@@ -1855,7 +1944,7 @@ function whistle(){
   }
   h.summoned=true;h.followRun=false;h.stuck=0;h.wt=0;h.bestD=1e9;h.bestT=0;
   h.follow=true;
-  toast('You whistle. '+h.name+' is on the way and will follow you. Press H again to make it wait.','good');
+  toast('You whistle. '+h.name+' is on the way and will follow you. Press '+padKey('Q')+' again to make it wait.','good');
 }
 
 /* ---- corrals: fenced pens with farm animals beside each stable ---- */
@@ -1978,8 +2067,8 @@ function mountHorse(h){
   const P=player;if(P.ship||P.dead||tileAt(P.x,P.y)===TL.DEEP)return;
   if(h.down){toast('That horse is hurt.');return;}
   P.horse=h;h.ridden=true;h.summoned=false;h.followRun=false;P.x=h.x;P.y=h.y;P.ha=h.a;P.hvx=0;P.hvy=0;
-  if(h.wild&&!h.mine){G.taming={h,t:0,need:3,slip:0};toast('The wild horse bucks! Hold E to calm it.','bad');return;}
-  toast((h.mine?h.name+': ':'')+'Mounted. Hold Shift to gallop, Q to dismount.');sfx('ui');
+  if(h.wild&&!h.mine){G.taming={h,t:0,need:3,slip:0};toast('The wild horse bucks! Hold '+padKey('D')+' to calm it.','bad');return;}
+  toast((h.mine?h.name+': ':'')+'Mounted. Hold Shift to gallop, '+padKey('D')+' to dismount.');sfx('ui');
 }
 function dismount(){
   const P=player,h=P.horse;if(!h)return;
@@ -2021,7 +2110,7 @@ function updatePlayerControls(dt){
       s.thr=Math.min(1,pad.sm)*(ad>1.9?0.25:0.3+0.7*Math.max(0,Math.cos(ad)));
     }
     if(isDrunk()){s.turn=clamp(s.turn+Math.sin(G.t*1.1)*0.5,-1,1);s.thr*=0.8+0.2*Math.sin(G.t*0.7);}
-    if(mouse.down||keys.Space){fireBroadside(s,aimSide(s));fireBow(s);}
+    if(mouse.down){fireBroadside(s,aimSide(s));fireBow(s);}
     if(mouse.rdown)fireSpecial(s);
     P.a=s.a;
   }else{
@@ -2061,7 +2150,7 @@ function updatePlayerControls(dt){
     P.a=Math.atan2(mouse.wy-P.y,mouse.wx-P.x);
     P.vx=(P.x-px)/Math.max(dt,0.001);P.vy=(P.y-py)/Math.max(dt,0.001);
     if(t0!==TL.DEEP){
-      handUse(0,null,mouse.down||keys.Space);handUse(1,null,mouse.rdown||keys.KeyF);
+      handUse(0,null,mouse.down);handUse(1,null,mouse.rdown);
     }
   }
 }
@@ -2071,6 +2160,8 @@ function syncPlayer(){
 }
 
 /* ================= spawning / heat ================= */
+/* how many AI ships sail the world (single player and online alike) */
+const SEA_N={merchant:22,navy:9,raider:11};
 function spawnSea(fac,near){
   const P=player;
   for(let k=0;k<30;k++){
@@ -2096,10 +2187,10 @@ function maintain(dt){
   G.spawnT-=dt;if(G.spawnT>0)return;G.spawnT=1.7;
   const P=player;const cnt={merchant:0,navy:0,raider:0};
   for(const s of ships)if(s.crew==='ai'&&!s.dead&&!s.boss)cnt[s.fac]=(cnt[s.fac]||0)+1;
-  if(cnt.merchant<12)spawnSea('merchant');
-  if(cnt.raider<5)spawnSea('raider');
+  if(cnt.merchant<SEA_N.merchant)spawnSea('merchant');
+  if(cnt.raider<SEA_N.raider)spawnSea('raider');
   const st=stars();
-  const wantNavy=5+(st>=2?Math.min(st,4):0);
+  const wantNavy=SEA_N.navy+(st>=2?Math.min(st,4):0);
   if(cnt.navy<wantNavy)spawnSea('navy',st>=2&&G.seen);
   if(st>0&&!P.dead&&G.seen){
     let hostile=0;for(const p of people)if(p.kind==='soldier'&&!p.dead&&dist(p.x,p.y,P.x,P.y)<900)hostile++;
@@ -2215,10 +2306,12 @@ function updateAll(dt){
   runTimers(dt);storyTick(dt);
   if(G.god&&!player.dead){player.hp=player.maxhp;if(player.ship)player.ship.hp=player.ship.maxhp;}
   G.tod=(G.tod+dt/380)%1;
+  G.worldDay=(G.worldDay||0)+dt/380;treeTick(dt);if(G.chopCd>0)G.chopCd-=dt;
+  if(G.stumps&&G.stumps.length){G.stumpT=(G.stumpT||0)+dt;if(G.stumpT>1){G.stumpT=0;for(const st of G.stumps)if(G.worldDay>=st.t){decor[st.i]=st.d;st.done=true;}compact(G.stumps,q=>!q.done);}}
   if(!player.dead){updatePlayerControls(dt);}
   if(G.board){
     const b=G.board,P=player;
-    if(P.dead||!keys.KeyE||b.s.dead||b.s.crew!=='ai'||!nearHull(b.s)){G.board=null;if(!P.dead&&!b.s.dead)toast('Boarding broken off.','bad');}
+    if(P.dead||b.s.dead||b.s.crew!=='ai'||!nearHull(b.s)){G.board=null;if(!P.dead&&!b.s.dead)toast('Boarding broken off.','bad');}
     else{
       b.s.held=0.3;b.t+=dt;
       if(Math.random()<0.4)sparks((b.s.x+P.x)/2+rr(-12,12),(b.s.y+P.y)/2+rr(-12,12),2,'#fff3c0');
@@ -2430,6 +2523,7 @@ function drawPickup(k){
     case 'gold':ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(1,3,6,3,0,0,TAU);ctx.fill();
       for(let i=0;i<3;i++){ctx.fillStyle='#f4c542';ctx.strokeStyle='#8a6208';ctx.lineWidth=1;ctx.beginPath();ctx.arc(-3+i*3,bob-i*1.5,3.4,0,TAU);ctx.fill();ctx.stroke();}break;
     case 'ammo':ctx.fillStyle='#5a3d22';ctx.fillRect(-6,-5+bob,12,10);ctx.fillStyle='#d8c9a4';ctx.fillRect(-4,-3+bob,8,2);ctx.fillStyle='#222';ctx.fillRect(-1,0+bob,2,4);break;
+    case 'wood':ctx.rotate(k.rot||0);ctx.fillStyle='rgba(0,0,0,.25)';ctx.fillRect(-9,-1+bob+3,18,4);ctx.fillStyle='#8a6a3c';ctx.fillRect(-9,-3+bob,18,4);ctx.fillStyle='#b8925a';ctx.fillRect(-9,-3+bob,18,1.5);ctx.fillStyle='#6b4a2b';ctx.fillRect(-4,2+bob,12,3);break;
     case 'rum':ctx.fillStyle='#2f7d46';ctx.fillRect(-3,-6+bob,6,12);ctx.fillRect(-1.5,-9+bob,3,4);ctx.fillStyle='#e8d9a8';ctx.fillRect(-3,-2+bob,6,4);break;
     case 'chest':
       ctx.fillStyle='rgba(0,0,0,.3)';ctx.beginPath();ctx.ellipse(2,5,11,5,0,0,TAU);ctx.fill();
@@ -2497,6 +2591,7 @@ function render(){
   for(let ty=ty0;ty<=ty1;ty++)for(let tx=tx0;tx<=tx1;tx++){
     const i=ty*MW+tx,d=decor[i];if(!d)continue;
     const cx=tx*TS+TS/2,cy=ty*TS+TS/2;
+    if(d===5){const dr=()=>{ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(1,3,9,4,0,0,TAU);ctx.fill();ctx.fillStyle='#6b4a2b';ctx.fillRect(-6,-4,12,8);ctx.fillStyle='#c9a46a';ctx.beginPath();ctx.ellipse(0,-4,6,3,0,0,TAU);ctx.fill();ctx.strokeStyle='#8a6a3c';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(0,-4,3,1.5,0,0,TAU);ctx.stroke();};if(TKr<1)upr(cx,cy,dr);else{ctx.save();ctx.translate(cx,cy+4);dr();ctx.restore();}continue;}
     if(d>=9){const o=shade[i];if(TKr<1)Q(cy+8,()=>tTree(cx,cy,d-9,o));else topTrees.push(cx-36+(o%9)-4,cy-36+((o>>3)%9)-4,d-9);}
     else{const s=d===1?spr.bush:d===2?spr.rock:d===3?spr.shell:spr.bones;if(TKr<1)upr(cx,cy,()=>ctx.drawImage(s,-16,-24));else ctx.drawImage(s,cx-16,cy-16);}
   }
@@ -2552,6 +2647,7 @@ function render(){
     const tx=topTrees[i],ty=topTrees[i+1],near=!P.ship&&!P.dead&&Math.abs(P.x-(tx+36))<46&&Math.abs(P.y-(ty+36))<46;
     if(near){ctx.globalAlpha=0.55;ctx.drawImage(spr.tree[topTrees[i+2]],tx,ty);ctx.globalAlpha=1;}else ctx.drawImage(spr.tree[topTrees[i+2]],tx,ty);
   }
+  drawTreeBars(TKr);
   if(TKr<1&&!P.ship&&!P.dead&&G.state==='play'){
     let hid=false;
     for(const b of buildings){const bx0=b.x*TS,bx1=(b.x+b.w)*TS,by1=(b.y+b.h)*TS;if(P.x>bx0-8&&P.x<bx1+8&&P.y<by1&&P.y>b.y*TS-90/TKr){hid=true;break;}}
@@ -2592,8 +2688,8 @@ function render(){
       const rdy=s.scd[k]<=0,L2=ST[s.type].L;
       ctx.save();ctx.setLineDash([4,7]);ctx.lineWidth=1.6;ctx.strokeStyle=rdy?'rgba(255,215,120,.7)':'rgba(255,120,90,.4)';
       if(k==='vol'){ctx.beginPath();ctx.arc(s.x,s.y,CANNON_RANGE*0.95,0,TAU);ctx.stroke();}
-      else if(k==='all'){const a=Math.atan2(mouse.wy-s.y,mouse.wx-s.x);ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x+Math.cos(a)*CANNON_RANGE*1.3,s.y+Math.sin(a)*CANNON_RANGE*1.3);ctx.stroke();}
-      else{const a=Math.atan2(mouse.wy-s.y,mouse.wx-s.x);ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(s.x+Math.cos(a)*340,s.y+Math.sin(a)*340);ctx.stroke();}
+      else if(k==='all'){const m=bowMuzzle(s),a=Math.atan2(mouse.wy-m.y,mouse.wx-m.x);ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x+Math.cos(a)*CANNON_RANGE*1.3,m.y+Math.sin(a)*CANNON_RANGE*1.3);ctx.stroke();}
+      else{const m=bowMuzzle(s),a=Math.atan2(mouse.wy-m.y,mouse.wx-m.x);ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x+Math.cos(a)*340,m.y+Math.sin(a)*340);ctx.stroke();}
       ctx.restore();
     }
   }
@@ -2709,7 +2805,7 @@ const hc={};
 function setTxt(el,k,v){if(hc[k]!==v){hc[k]=v;el.textContent=v;}}
 function setHTML(el,k,v){if(G.padOn&&el===weaponEl)v=padLabelHTML(v);if(hc[k]!==v){hc[k]=v;el.innerHTML=v;}}
 function toast(msg,cls){
-  const d=document.createElement('div');d.className='toast '+(cls||'');d.textContent=msg;toastBox.appendChild(d);
+  const d=document.createElement('div');d.className='toast '+(cls||'');d.textContent=ctl(msg);toastBox.appendChild(d);
   while(toastBox.children.length>5)toastBox.removeChild(toastBox.firstChild);
   setTimeout(()=>{if(d.parentNode)d.remove();},3700);
 }
@@ -2728,7 +2824,7 @@ function updateHUD(){
   setTxt(starsNote,'sn',note);
   // mission
   const mt=missionTarget();
-  if(mission){setTxt(mTitle,'mt',mission.def.title);setTxt(mObj,'mo',mission.def.obj(mission));}
+  if(mission){setTxt(mTitle,'mt',mission.def.title);setTxt(mObj,'mo',ctl(mission.def.obj(mission)));}
   else{setTxt(mTitle,'mt',G.done>0?'Free sailing':'Welcome to Blackwater Bay');setTxt(mObj,'mo',G.done>0?'Visit The Rusty Anchor in Tortuga for more work.':'Head to The Rusty Anchor tavern in Tortuga to find work.');}
   if(mt){const d=Math.round(dist(P.x,P.y,mt.x,mt.y)/TS);setTxt(mDist,'md',d+' tiles away');}else setTxt(mDist,'md','');
   // weapon
@@ -2744,7 +2840,7 @@ function updateHUD(){
     setHTML(weaponEl,'w','<span><b>'+(s.name||st2.name)+'</b>'+kn+' kn</span>'+(st2.guns?'<span>Port<span class="gun"><i style="width:'+(l*100).toFixed(0)+'%"></i></span></span><span>Starboard<span class="gun"><i style="width:'+(r*100).toFixed(0)+'%"></i></span></span>':'<span>No cannons</span>')+spH+'<span><b>F</b>Leave</span>');
   }else{
     const gw=WEAP[G.gun];
-    setHTML(weaponEl,'w',hudW()+'<span style="opacity:.7">Tab wheel &nbsp; <b>H</b>'+(G.steed&&G.steed.follow&&!G.steed.down?'steed: stay':'call steed')+(P.horse?' &nbsp; <b>Q</b>dismount &nbsp; <b>V</b>tonic &times;'+G.items.tonic:'')+'</span>');
+    setHTML(weaponEl,'w',hudW()+'<span style="opacity:.7">Tab wheel &nbsp; <b>'+padKey('Q')+'</b>'+(G.steed&&G.steed.follow&&!G.steed.down?'steed: stay':'call steed')+(P.horse?' &nbsp; <b>'+padKey('D')+'</b>dismount &nbsp; tonic &times;'+G.items.tonic:'')+'</span>');
   }
   {
     const mh=P.horse;
@@ -2752,14 +2848,14 @@ function updateHUD(){
       const st=steedStats(mh),lv=bondLevel(mh);
       steedHudEl.classList.remove('hidden');
       setTxt(sName,'sn',(mh.mine?mh.name:'Wild horse')+' - '+BREEDS[mh.breed].n);
-      setTxt(sBond,'sb',mh.mine?'Bond level '+lv+' ('+Math.round(mh.bond)+(lv<4?' / '+BOND_AT[lv]:' max')+')'+(mh.winded?' - winded!':''):'Untamed. Hold E to calm it.');
+      setTxt(sBond,'sb',mh.mine?'Bond level '+lv+' ('+Math.round(mh.bond)+(lv<4?' / '+BOND_AT[lv]:' max')+')'+(mh.winded?' - winded!':''):'Untamed. Hold '+padKey('D')+' to calm it.');
       staFill.style.width=clamp(mh.stam/st.stam*100,0,100).toFixed(0)+'%';
       shpFill.style.width=clamp(mh.hp/st.hp*100,0,100).toFixed(0)+'%';
     }else steedHudEl.classList.add('hidden');
   }
   // prompt
   let pr='';
-  if(!P.dead&&!G.shop){const c=pickInteract();if(c)pr='<kbd>'+padKey('E')+'</kbd>'+c.label.replace(/&/g,'&amp;').replace(/</g,'&lt;')+(P.ship&&c.label!=='Leave ship'?'<small>'+padKey('F')+' to leave your ship</small>':'');}
+  if(!P.dead&&!G.shop){const c=pickInteract();if(c)pr='<kbd>'+padKey(c.fy?'D':'E')+'</kbd>'+c.label.replace(/&/g,'&amp;').replace(/</g,'&lt;')+(P.ship&&!c.fy?'<small>'+padKey('D')+' to leave your ship</small>':'');else if(P.ship)pr='<kbd>'+padKey('D')+'</kbd>Leave ship';}
   if(hc.pr!==pr){hc.pr=pr;promptEl.innerHTML=pr;promptEl.classList.toggle('hidden',!pr);}
   hurtEl.style.opacity=G.hurtFlash.toFixed(2);
   if(P.hp<30&&!P.dead)hurtEl.style.opacity=Math.max(G.hurtFlash,0.25+0.2*Math.sin(G.t*6)).toFixed(2);
@@ -2769,7 +2865,7 @@ function updateHUD(){
 const SHIP_PRICE={sloop:200,brig:520,galleon:600,flagship:1500,cutter:150,schooner:380,frigate:1000,manowar:2400,comet:5000};
 const REG_FEE={sloop:120,brig:260,galleon:320,flagship:700,cutter:90,schooner:200,frigate:480,manowar:1100,comet:0};
 const MODINFO={
-  bow:{n:'Bow chasers',c:350,d:'Level 2. Two forward cannons. They swivel only a few degrees toward your mouse and fire with your broadsides (left-click / Space).'},
+  bow:{n:'Bow chasers',c:350,d:'Level 2. Two forward cannons. They swivel only a few degrees toward your mouse and fire with your broadsides (left-click).'},
   all:{n:'360 swivel cannon',c:600,d:'Level 2. One heavy cannon at the bow that aims a full circle. Aim with the mouse and fire a single shot at a time (right-click).'},
   vol:{n:'360 volley',c:0,d:'Debug ship only. Twenty cannons in every direction at once.'},
   harp:{n:'Harpoon gun',c:450,d:'Level 2. Grapple an enemy ship, then fight across her deck to the captain and take her.'}
@@ -2821,6 +2917,98 @@ function fleetItems(z,items){
       G.wrecks.splice(G.wrecks.indexOf(w),1);const sh=spawnDockShip(w.type,pier);sh.own=true;sh.name=w.name;sh.mods=Object.assign({bow:0,all:0,harp:0},w.mods);sh.hp=Math.max(1,sh.maxhp*0.5);toast('The '+w.name+' breaks the surface.','good');}});
   });
 }
+
+/* ================= privateer contracts (the captain's desk) =================
+   One engine for single player and online. Single player: unlocked by a commission (G.privateer, granted later by the story).
+   Online: a short opening contract, then the regular board. While a contract runs you hold a letter of marque;
+   pirate towns attack on sight. */
+const CT_ADJ=['Crimson','Black','Rusty','Silent','Drowned','Gilded','Salt','Scarlet','Hollow','Grim'];
+const CT_NOUN=['Widow','Gull','Kraken','Maiden','Lantern','Serpent','Hound','Dagger','Siren','Gallows'];
+const CT_TIER=[{ship:'sloop',base:230,lim:420},{ship:'brig',base:420,lim:520},{ship:'frigate',base:800,lim:660}];
+const privateerOpen=()=>ONLINE?true:!!G.privateer;
+const inContract=()=>!!(mission&&mission.def&&mission.def.contract);
+function mkOffer(type,tier,name){
+  const T=CT_TIER[tier-1];
+  return {type,tier,name:name||('the '+CT_ADJ[ri(0,CT_ADJ.length-1)]+' '+CT_NOUN[ri(0,CT_NOUN.length-1)]),ship:T.ship,limit:T.lim,reward:Math.round((T.base+ri(0,70))*(type==='capture'?1.45:1)/5)*5};
+}
+function contractOffers(){
+  if(ONLINE&&!G.opening)return [Object.assign(mkOffer('sink',1,'the Rusty Gull'),{reward:150,limit:480,tutorial:true})];
+  const day=Math.floor(G.worldDay||0);
+  if(!G.offers||G.offerDay!==day){
+    G.offerDay=day;G.offers=[mkOffer('sink',1),mkOffer(rand()<0.5?'sink':'capture',2),mkOffer(rand()<0.5?'sink':'capture',3)];
+    for(const o of G.offers)o.type=o.tier===1&&o.type==='capture'?'sink':o.type;
+  }
+  return G.offers;
+}
+function contractDef(o){
+  const def={title:(o.type==='capture'?'Capture ':'Sink ')+o.name,brief:'',reward:o.reward,contract:true,
+    start(m){m.c=o;},
+    obj(m){const t=m.c.target;const left=Math.max(0,Math.ceil(G.marque));return (m.c.type==='capture'?'Capture ':'Sink ')+m.c.name+(m.c.type==='capture'?': harpoon her, fight to the cabin':'')+'  ('+Math.floor(left/60)+':'+String(left%60).padStart(2,'0')+')';},
+    target(m){const t=m.c.target;return t&&!t.dead?{x:t.x,y:t.y}:null;},
+    update(m,dt){
+      const t=m.c.target;
+      if(G.marque<=0){failContract(m,'The contract expired. The letter of marque has run out.');return;}
+      if(t&&t.dead&&!m.c.done)failContract(m,'Your target is gone.');
+    },
+    onSink(m,sh){if(sh===m.c.target){if(m.c.type==='sink')completeContract(m);else failContract(m,'She went down with her captain. The contract needed her taken alive.');}},
+    onCapture(m,sh){if(sh===m.c.target)completeContract(m);},
+    onFail(m){failContract(m,'Contract failed.');}};
+  return def;
+}
+function startContract(o){
+  if(mission){toast('Finish what ye started first.','bad');sfx('no');return;}
+  const P=player;let c=null;
+  const near=o.tutorial?[600,900]:[1000,1600];
+  for(let k=0;k<80&&!c;k++){const a=rr(0,TAU),r=rr(near[0],near[1]),x=P.x+Math.cos(a)*r,y=P.y+Math.sin(a)*r;if(tileAt(x,y)===0&&shipFree(x,y,0,ST.frigate))c={x,y};}
+  if(!c)c=randDeep();
+  if(!c){toast('The seas are too crowded to place your target.','bad');return;}
+  const oc=Object.assign({},o);
+  const t=mkShip(o.ship,'raider',c.x,c.y,rr(0,TAU),'ai');t.name=o.name;t.contractTarget=true;oc.target=t;
+  if(o.tier>=3){const e=mkShip('sloop','raider',c.x+rr(-90,90),c.y+rr(-90,90),t.a,'ai');e.name='escort';}
+  const def=contractDef(oc);mission={def,idx:300,stage:0,n:0};def.start(mission);
+  G.marque=o.limit;clearHeat();G.offers=null;
+  banner(def.title,'Privateer contract');
+  toast((o.tutorial?'How it works: a letter of marque keeps the Navy off you until the timer runs out, but pirate towns will attack you on sight. ':'Letter of marque granted. Pirate towns attack on sight. ')+'Follow the marker on your compass.');
+  sfx('ui');
+}
+function endContract(){G.marque=0;mission=null;}
+function completeContract(m){
+  const c=m.c;c.done=true;endContract();
+  gainGold(c.reward);G.contractsDone=(G.contractsDone|0)+1;sfx('coin');
+  banner('CONTRACT COMPLETE','+'+c.reward+' gold');
+  if(c.tutorial){G.opening=true;toast('The board at your captain\'s desk now has regular contracts.','good');}
+}
+function failContract(m,msg){if(!mission||mission.def!==m.def&&mission!==m)return;endContract();toast(msg,'bad');}
+function deskItems(z){
+  const sh=z.sh,D=z.D,items=[],own=!!sh.own,nm=(ST[sh.type]||{}).name;
+  const full=fleetCount()>=3,np=G.items.papers|0;
+  items.push({sec:'Ship papers',t:own?'Registered: '+(sh.name||nm):'Claim the '+nm,d:own?'She is yours. Papers held: '+np+'.':full?'Your fleet is full (3/3). Sell a ship first.':np<=0?'You hold no ship papers. Buy a set at a Harbour Registry.':'File a set of ship papers ('+np+' held). Unlocks the repair and contract menus.',c:0,lbl:own?'Filed':'File',ok:()=>!own&&!full&&np>0,run(){claimShip(D,sh);}});
+  const c=mendCost(sh),sound=sh.hp>=sh.maxhp;
+  items.push({sec:'Repairs',t:'Crew repairs while you sleep: '+(sh.mendOn?'ON':'OFF'),d:!own?'Locked until the ship is registered.':sound?'The hull is sound.':'Costs '+c.gold+' gold and '+c.wood+' lumber ('+(G.items.lumber|0)+' held) when you sleep.',c:0,lbl:!own?'Locked':sound?'Sound':'Toggle',ok:()=>own&&!sound,run(){sh.mendOn=!sh.mendOn;}});
+  if(!own||!privateerOpen()){
+    items.push({sec:'Contracts',t:'Privateer contracts',d:!own?'Locked until the ship is registered.':'Locked. Only a privateer with the Crown\'s commission can take contracts.',c:0,lbl:'Locked',ok:()=>false,run(){}});
+    return items;
+  }
+  return items.concat(contractItems(z));
+}
+function contractItems(z){
+  const items=[];
+  if(inContract()){
+    const m=mission;
+    items.push({sec:'Contracts',t:'Current: '+m.def.title,d:'Reward '+m.c.reward+' gold. Follow the marker on your compass.',c:0,lbl:'Active',ok:()=>false,run(){}});
+    items.push({t:'Abandon the contract',d:'Your letter of marque is withdrawn and the pirate towns calm down.',c:0,lbl:'Abandon',ok:()=>true,run(){endContract();toast('Contract abandoned.');}});
+    return items;
+  }
+  if(mission){items.push({sec:'Contracts',t:'A job is already underway',d:'Finish it first.',c:0,lbl:'—',ok:()=>false,run(){}});return items;}
+  for(const o of contractOffers()){
+    const T=ST[o.ship].name;
+    items.push({sec:'Contracts',t:(o.tutorial?'Opening contract: ':(o.type==='capture'?'Capture ':'Sink ')+(o.tier===3?'(hard) ':o.tier===2?'(medium) ':'(easy) '))+(o.tutorial?'Sink ':'')+o.name,
+      d:(o.tutorial?'A lone rusty raider. A letter of marque keeps the Navy off you, pirate towns will attack on sight. ':'')+(o.type==='capture'?'A '+T+'. Harpoon her, fight to the cabin and take the captain. Sinking her fails the contract. ':'A '+T+' of the raider fleet. Send her down. ')+(o.tier>=3?'She sails with an escort. ':'')+'Time limit '+Math.round(o.limit/60)+' min.',
+      c:0,lbl:'+'+o.reward+'g',ok:()=>!mission,run(){closeShop();startContract(o);}});
+  }
+  return items;
+}
+const bowMuzzle=s=>({x:s.x+Math.cos(s.a)*ST[s.type].L*0.5,y:s.y+Math.sin(s.a)*ST[s.type].L*0.5});
 const BOW_SWIVEL=0.2;
 function bowAim(s){if(s.crew!=='player')return s.a;const r=Math.atan2(mouse.wy-s.y,mouse.wx-s.x);return s.a+clamp(angDiff(r,s.a),-BOW_SWIVEL,BOW_SWIVEL);}
 function fireBow(s){
@@ -2842,8 +3030,9 @@ function fireSpecial(s){
   const st=ST[s.type],up=1+0.3*G.upg.dmg,c=Math.cos(s.a),sn=Math.sin(s.a);
   if(k==='all'){
     s.scd.all=SPEC_CD.all;
-    const a=Math.atan2(mouse.wy-s.y,mouse.wx-s.x),ca=Math.cos(s.a),sa=Math.sin(s.a);
+    const ca=Math.cos(s.a),sa=Math.sin(s.a);
     const x=s.x+ca*st.L*0.5,y=s.y+sa*st.L*0.5,sp=CANNON_SPEED*1.1;
+    const a=Math.atan2(mouse.wy-y,mouse.wx-x);
     const ang=a+rr(-0.012,0.012);
     balls.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,life:CANNON_RANGE*1.3/sp,dmg:Math.max(st.dmg,14)*1.8*up,own:s,fac:'pirate',byPlayer:true});
     smoke(x+Math.cos(a)*8,y+Math.sin(a)*8,3,8);addP(x+Math.cos(a)*6,y+Math.sin(a)*6,0,0,0.12,10,'rgba(255,210,110,.95)',{grow:22});
@@ -2865,8 +3054,8 @@ function fireSpecial(s){
     G.shake=Math.max(G.shake,11);alarm(s.x,s.y,760);
   }else{
     s.scd.harp=SPEC_CD.harp;
-    const a=Math.atan2(mouse.wy-s.y,mouse.wx-s.x);
-    harps.push({x:s.x+Math.cos(a)*st.L*0.3,y:s.y+Math.sin(a)*st.L*0.3,vx:Math.cos(a)*560,vy:Math.sin(a)*560,life:0.62,s});
+    const m=bowMuzzle(s),a=Math.atan2(mouse.wy-m.y,mouse.wx-m.x);
+    harps.push({x:m.x,y:m.y,vx:Math.cos(a)*560,vy:Math.sin(a)*560,life:0.62,s});
     sfx('slash',s.x,s.y);G.shake=Math.max(G.shake,2);
   }
 }
@@ -2880,7 +3069,7 @@ function updateHarps(dt){
     h.x+=h.vx*dt;h.y+=h.vy*dt;h.life-=dt;
     if(tileAt(h.x,h.y)>=8){h.dead=true;h.s.scd.harp=Math.min(h.s.scd.harp,2.5);continue;}
     for(const t of ships){
-      if(t.dead||t===h.s||t.fac==='pirate')continue;
+      if(t.dead||t===h.s||t.fac==='pirate'||!t.crew)continue;
       if(shipHit(t,h.x,h.y,6)){h.dead=true;startGrapple(h.s,t);break;}
     }
     if(!h.dead&&h.life<=0){h.dead=true;h.s.scd.harp=Math.min(h.s.scd.harp,2.5);}
@@ -2935,7 +3124,7 @@ function deckLos(D,x0,y0,x1,y1){
 function makeDeck(tgt){
   const dim=DECK_DIMS[tgt.type]||[30,10],W=dim[0],H=dim[1];
   const D={tgt,W,H,pw:W*TS,ph:H*TS,solids:[],enemies:[],bullets:[],bombs:[],pick:[],corpses:[],p:{x:2.4*TS,y:H/2*TS},pa:0,
-    cam:{x:2.4*TS,y:H/2*TS,z:Math.min(1.5,Math.max(0.8,Math.min(VW,VH)/600))},t:0,retreat:0,hasKey:false,doorOpen:false,win:0,hitIn:0,fac:tgt.fac,noise:0,kills:0,total:0};
+    cam:{x:2.4*TS,y:H/2*TS,z:0.5},t:0,retreat:0,hasKey:false,doorOpen:false,win:0,hitIn:0,fac:tgt.fac,noise:0,kills:0,total:0};
   const cx=(W-7)*TS,top=2*TS,bot=(H-2)*TS,dy=H/2*TS,wt=12;
   D.cab={x:cx,y:top,w:7*TS,h:bot-top};D.door={x:cx,y:dy};
   const S=(x,y,w,h,k)=>D.solids.push({x,y,w,h,k});
@@ -3015,6 +3204,7 @@ function endDeck(win){
     const looted=D.loot&&D.loot.opened;
     G.kills+=D.kills;
     if(f0==='navy')addHeat(25);
+    if(mission&&mission.def.onCapture)mission.def.onCapture(mission,t);
     if(mission&&mission.def.onSink)mission.def.onSink(mission,{fac:f0,boss:false,type:t.type});
     toast('The '+ST[t.type].name+' is yours. Board her whenever ye like.'+(looted?'':' Ye left her strongbox behind!'),looted?'good':'bad');
     banner('SHIP TAKEN',looted?'Spoils collected':'The loot was left aboard');sfx('coin');
@@ -3113,7 +3303,7 @@ function deckEnemy(D,e,dt){
   }
 }
 function deckCam(D,dt){
-  const c=D.cam,tz=clamp(Math.min(VW,VH)/600,0.8,1.5)*G.zoomMul;
+  const c=D.cam,tz=0.5;
   c.z+=(tz-c.z)*(1-Math.exp(-dt*4));
   const hw=VW/2/c.z,hh=VH/2/c.z,m=70;let tx=D.p.x,ty=D.p.y;
   if(D.pw+2*m<=2*hw)tx=D.pw/2;else tx=clamp(tx,hw-m,D.pw-hw+m);
@@ -3133,7 +3323,7 @@ function updateDeck(dt){
   const spd=112*((keys.ShiftLeft||keys.ShiftRight)?1.4:1);
   if(l>0){P.walk+=dt*spd/55;deckMove(D,p,dx*spd*dt,dy*spd*dt,7);}
   D.pa=Math.atan2(mouse.wy-p.y,mouse.wx-p.x);
-  handUse(0,D,mouse.down||keys.Space);handUse(1,D,mouse.rdown||keys.KeyF);
+  handUse(0,D,mouse.down);handUse(1,D,mouse.rdown);
   if(D.hitIn>0){D.hitIn-=dt;if(D.hitIn<=0)deckMelee(D);}
   // cabin door
   if(!D.doorOpen&&Math.hypot(p.x-D.door.x,p.y-D.door.y)<48){
@@ -3340,7 +3530,6 @@ function onKey(c){
     if(WHEEL.open){WHEEL.close();return;}
     setPaused(!G.paused);return;
   }
-  if(c==='KeyI'&&!G.paused&&!G.shop&&!G.dlg&&!player.dead&&G.state==='play'){if(invVisible())closeStash();else if(!G.stashOpen&&!WHEEL.open)openInv();return;}
   if(G.paused||G.stashOpen)return;
   if(WHEEL.open)return;
   if(c==='KeyM'){toggleMap();return;}
@@ -3354,11 +3543,9 @@ function onKey(c){
   if(G.dlg){dlgKey(c);return;}
   if(c==='KeyG'&&!(G.deck&&(G.deck.scene==='prison'||G.deck.scene==='int'))){swapHands();return;}
   if(G.deck){deckKey(c);return;}
-  if(c==='KeyQ'&&player.horse){dismount();return;}
-  if(c==='KeyH'){whistle();return;}
-  if(c==='KeyV'){useTonic();return;}
-  if(c==='KeyE'){const it=pickInteract();if(it)it.use();else if(player.ship)leaveShip();}
-  else if(c==='KeyF'&&player.ship){leaveShip();keys.KeyF=false;}
+  if(c==='KeyQ'){whistle();return;}
+  if(c==='KeyE'){const it=pickInteract();if(it&&!it.fy)it.use();}
+  else if(c==='KeyF'){rideToggle();}
 }
 addEventListener('keydown',e=>{
   const c=e.code;touchOff();
@@ -3367,6 +3554,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{keys[e.code]=false;});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;mouse.down=false;mouse.rdown=false;if(G.state==='play'&&!G.paused&&!G.shop)setPaused(true);});
+addEventListener('keydown',e=>{if(!G.touchOn&&G.state==='play')G.padOn=false;},true);
 cv.addEventListener('mousedown',e=>{if(G.state!=='play')return;if(G.touchOn)return;G.padOn=false;if(e.button===0)mouse.down=true;if(e.button===2)mouse.rdown=true;});
 addEventListener('mouseup',e=>{if(e.button===0)mouse.down=false;if(e.button===2)mouse.rdown=false;});
 addEventListener('mousemove',e=>{if(G.touchOn)return;if(G.padOn&&Math.abs(e.movementX||0)+Math.abs(e.movementY||0)<2)return;mouse.x=e.clientX;mouse.y=e.clientY;G.padOn=false;});
@@ -3389,7 +3577,7 @@ function debugShip(type){
   if(!shipFree(p.x,p.y,a,ST[type])){return 'No open water close enough. Go nearer the coast.';}
   const sh=mkShip(type,'pirate',p.x,p.y,a,null);
   if(type==='comet')sh.mods={bow:1,all:1,harp:1,vol:1};
-  return 'A '+ST[type].name+' (no papers, unmanned) floats nearby. Press E beside her to board.';
+  return 'A '+ST[type].name+' (no papers, unmanned) floats nearby. Press '+padKey('D')+' beside her to board.';
 }
 function debugWeapons(){
   for(const k of WORDER)G.owned[k]=1;
@@ -3429,7 +3617,10 @@ const dbgStory=(n,t,d,setup)=>({t,d,p:'Quest',close:true,run(){if(mission)missio
 const DBG_PAGES={
   root:()=>[
     {head:'Debug menu'},
-    dbgNav('Quests','Jump to any quest, grouped by line and in order.','quests'),
+    ...(ONLINE?[]:[dbgNav('Quests','Jump to any quest, grouped by line and in order.','quests')]),
+    ...(ONLINE?[]:[{t:'Grant privateer commission',d:'Starts the story quest "Clear Your Name": recover Lt. Hale\'s body from the Gravemaw and take it to the King. Finishing it grants the commission.',p:'Contracts',close:true,run(){mission=null;G.story.s=7;G.story.haleDead=true;G.story.body=false;G.privateer=false;startStoryMission(7);return '';}},
+    {t:'Skip: grant commission now',d:'Unlocks contracts at once, no quest.',p:'Contracts',run(){G.privateer=true;return 'Commission granted. Use the desk below deck on a ship you own.';}}]),
+    {t:ONLINE?'Leave online preview':'Multiplayer (alpha preview)',d:ONLINE?'Return to the single-player game and its save.':'Switches to the online base game: the open world with no story, on its own save slot. No server yet. Your single-player save is kept.',p:'Online',close:true,run(){if(!ONLINE)writeSave(false);setOnline(!ONLINE);return '';}},
     dbgNav('Ships','Summon any ship, unmanned and unpapered.','ships'),
     dbgNav('Cheats','Gold, healing, god mode and weapons.','cheats'),
     {t:'Teleport',d:'Opens the big map. Click a spot to go there.',p:'Map',close:true,run(){G.tp=true;toggleMap();return '';}},
@@ -3448,6 +3639,10 @@ const DBG_PAGES={
     dbgStory(4,'4. Report to the King','Hale is dead. Go and face the King.',()=>{G.story.s=4;G.story.haleDead=true;startStoryMission(4);}),
     {t:'5. Escape the Royal Oubliette',d:'Jumps into the prison stealth level.',p:'Quest',close:true,run(){mission={def:STORY[5],idx:105,stage:0,n:0};G.story.s=5;startPrison();return '';}},
     dbgStory(6,'6. Fugitive of the Crown','The Navy pursuit begins around you.',()=>{G.story.s=6;startStoryMission(6);}),
+    {head:'Tutorial chain'},
+    ...[[1,'Washed Ashore','Tavern, meal, first horse.'],[2,'Sea Legs','Armory, Sergeant Brand, wheel, throw, swing, stash.'],[3,'Papers, Please','The stranger, the loaner sloop, steal a ship.'],[4,'First Command','Harbourmaster drill on the guns.'],[5,'Word on the Docks','The hand-off to the tavern line or the King.']].map(([k,t,d])=>({t:k+'. '+t,d,p:'Tutorial',close:true,run(){mission=null;G.tut={s:k,st:0};tutPos.__=0;startStoryMission(10+k);return '';}})),
+    ...(ONLINE?[{t:'6. The King\'s Letter (online)',d:'Go to the King for the commission.',p:'Tutorial',close:true,run(){mission=null;G.tut={s:6,st:0};startStoryMission(16);return '';}}]:[]),
+    {t:'Skip: mark tutorial done',d:'Ends the tutorial chain.',p:'Tutorial',run(){mission=null;G.tut={s:99,st:0};storySyncNpc();return 'Tutorial marked done.';}},
     {head:'Reset'},
     {t:'Clear current quest',d:'Drops the active quest without finishing it.',p:'Reset',run(){mission=null;return 'Quest cleared.';}},
     {t:'Reset the Crown line',d:'Sets the story back to the very start.',p:'Reset',run(){mission=null;G.story={s:0,haleDead:false};storySyncNpc();return 'Crown line reset. Finish the tavern line to start it again.';}}
@@ -3519,6 +3714,39 @@ $('resume').addEventListener('click',()=>{setPaused(false);$('resume').blur();})
 
 /* ================= save / load ================= */
 const CHANGELOG=[
+{v:73,d:'Oct 15, 2026',n:['The controls help screen no longer lists Rum, ship papers. E and A no longer get you off a ship either, and the V key for the horse tonic is gone (use the weapon wheel or inventory). E and A no longer board or hijack ships (F / Y only), and Y no longer uses the horse tonic. Dig, talk and enter stay on E / A.']},
+{v:72,d:'Oct 15, 2026',n:['Taming a wild horse is now a hold on F / Y (the same button that mounts; E still works). Hijacking: press F, E or Y alongside a weak enemy or merchant ship and the boarding timer counts down by itself, no need to hold the button. Controls condensed. The I key no longer opens the inventory (open it from the weapon wheel). Keyboard: Space and F no longer attack (use the mouse buttons), Q now calls your steed instead of H, and F is the only mount / board / get-off key. Controller: B no longer dismounts or leaves the ship (Y does it), call steed moved from X to D-pad Up, and the D-pad zoom is removed until it is reworked.']},
+{v:71,d:'Oct 15, 2026',n:['F on keyboard and Y on controller now mount a nearby horse or board a nearby empty ship from foot, and put you back on foot when you press them while riding or at the helm (Q and B still work). With nothing to board, Y still uses a horse tonic. Boarding and hijack fights now use a fixed 50% zoom.']},
+{v:70,d:'Oct 15, 2026',n:['Ship papers at the Harbour Registry now cost 300 gold (was 150).']},
+{v:69,d:'Oct 15, 2026',n:['Tutorial hand-off no longer mentions a letter of marque. The dockhand only says the King wants to see a trusted captain; the King grants the commission himself.']},
+{v:68,d:'Oct 15, 2026',n:['More ships at sea in both modes: roughly 22 merchants (was 12), 11 raiders (was 5) and 9 Navy patrols (was 5) sail the world.']},
+{v:67,d:'Oct 15, 2026',n:['Controller: the weapon stash menu now keeps your place correctly after each choice (the highlight restarts at the top of the list instead of jumping to a random button), and the highlighted button scrolls into view.']},
+{v:66,d:'Oct 15, 2026',n:['Controller weapon wheel: hold LB the whole time you use it. Aim with a stick, press A to use the highlighted slice, B to go back a level, and releasing LB closes the wheel without choosing anything.']},
+{v:65,d:'Oct 15, 2026',n:['Controller: clicking the left stick (L3) now toggles running on and off instead of needing to be held. Running switches off when you let go of the stick.']},
+{v:64,d:'Oct 15, 2026',n:['Unoccupied ships (docked or abandoned, not yours) can now be hit and sunk by cannon fire, but the harpoon only hooks ships with a crew aboard.']},
+{v:63,d:'Oct 15, 2026',n:['Fix: in Papers, Please, capturing a ship by harpoon and boarding fight now counts as stealing her. You are returned to the Tortuga pier and the quest moves on to Mercer.']},
+{v:62,d:'Oct 14, 2026',n:['Text that names controls (toasts, dialogue, quest objectives) now follows the input you are using: keyboard and mouse, Xbox or PlayStation buttons.']},
+{v:61,d:'Oct 14, 2026',n:['Fix: during Sea Legs the Armory now sells a 10 gold Recruit\'s Cutlass, so the first weapon is affordable.']},
+{v:60,d:'Oct 14, 2026',n:['New opening chain in both modes. Washed Ashore: Silas finds you on the beach, you eat at the tavern and tame your first horse. Sea Legs: buy a blade, then Sergeant Brand teaches the weapon wheel, throwing, swinging and the stash (you keep a cutlass and a little gold, the loaned gear goes back). Papers, Please: a stranger at the shipyard lends you a harpoon sloop to steal a ship, sells it, and gives you a free Cutter. First Command: Harbourmaster Pell drills you on the broadside, bow guns, swivel and harpoon, then your ship goes back to stock. After that a dockhand sends you to Captain Flint (single player) or the King (online).']},
+{v:59,d:'Oct 14, 2026',n:['Walk-in doors: step onto a door to enter a building, step onto the exit to leave it, and the same for stairs in dungeons and the ladder out of a ship\'s lower deck. E still works.']},
+{v:58,d:'Oct 14, 2026',n:['Story quests now send you inside Crown Rock castle: the summons, the report and Clear Your Name all continue when you speak to the King in his throne room, not at the door.','Clear Your Name is longer: an opening scene, a two-level descent (cult-haunted upper crypt, then the lair), Hale\'s sealed last letter, a brood ambush when you lift his body, Navy patrols on the way home, and a longer scene with the King.']},
+{v:57,d:'Oct 14, 2026',n:['Single player story: new quest "Clear Your Name". Return to the Gravemaw, recover Lt. Hale\'s body and carry it to the King, who sees the beast\'s claw marks, accepts you were telling the truth and grants the Crown\'s letter of marque. That unlocks privateer contracts at your captain\'s desk. For now it is started from the debug menu (Grant privateer commission).']},
+{v:56,d:'Oct 14, 2026',n:['Weapon stash: stored weapons are now grouped by type (Blades, Pistols, Long guns) in sub-menus under the Carrying list (Thrown weapons can be carried or swapped like any other), with their damage shown.']},
+{v:55,d:'Oct 14, 2026',n:['The captain\'s desk is now one menu with Ship papers, Repairs and Contracts. File papers to register the ship and unlock the rest; Contracts stay greyed out until you hold the Crown\'s commission. The separate carpenter\'s bench and contract board are gone.']},
+{v:54,d:'Oct 14, 2026',n:['Ship interiors: the captain\'s desk is only for ship papers and the ship\'s log. Privateer contracts moved to their own Contract board, and the Carpenter\'s bench (crew repair) now appears on every ship, including small ones that were missing it.']},
+{v:53,d:'Oct 14, 2026',n:['Hatchets and throwing knives: after you put one in a hand from the weapon wheel, the wheel offers a melee weapon for your other hand (or keep what you hold). One hand throws while the other swings, and you can still use both together.']},
+{v:52,d:'Oct 14, 2026',n:[
+'Privateer contracts at the captain\'s desk (on a ship you own): sink a named raider, or harpoon her and capture the captain. Harder targets pay more, and the tougher ones sail with an escort.',
+'While a contract runs you hold a letter of marque, so the Navy leaves you alone, but pirate towns attack you on sight. There is a time limit, shown on your objective.',
+'Single player: the desk unlocks once you hold the Crown\'s commission (coming later in the story; there is a debug item to grant it for testing).',
+'Online preview: a short opening contract teaches the basics, then the regular board opens.']},
+{v:51,d:'Oct 14, 2026',n:[
+'Lumber: a new resource shown in your inventory. Chop trees by swinging a melee weapon at them (2 to 4 lumber each). Trees take several hits: an axe or hatchet is quickest (2 to 3), then a cutlass (4), a rapier or knife is slow, and fists are slowest. A chopped tree leaves a stump and grows back after one full day and night.',
+'Sunk ships leave floating planks you can collect, and treasure chests often hold a little lumber too.',
+'Below deck, a carpenter\'s bench next to the captain\'s bunk lets you have the crew mend the hull while you sleep. It costs gold and lumber based on the damage.',
+'Works the same in single player and the online preview.']},
+{v:50,d:'Oct 14, 2026',n:['Debug menu > Multiplayer (alpha preview): the open world with no story or tavern jobs, on its own separate save. There is no server yet. Use Back to single player on its main menu, or the debug menu, to return.']},
+{v:49,d:'Oct 14, 2026',n:['Harpoon gun now aims like the swivel cannon: it fires from the bow straight at your mouse, and the aim lines start at the bow too.']},
 {v:48,d:'Oct 13, 2026',n:['Corral fences now block you on foot as well as horses (go in through the gate).']},
 {v:47,d:'Oct 13, 2026',n:[
 'Tortuga and Bonny\'s Rest both fight back after you kill 3 of their people. The fight lasts 45 seconds with a timer on screen.',
@@ -3542,7 +3770,7 @@ const CHANGELOG=[
 'New weapon system: two hands. Attack uses the left hand and alt attack the right. Swap hands from G or the wheel.',
 'Thrown weapons: grenados, Molotov cocktails (rum bottles), throwing knives (max 20) and hatchets. Out of ammo you punch, or swing your last knife or hatchet.',
 'Weapon wheel with sub-menus for weapons, items, crew and steed.',
-'Inventory on the I key: papers, horse tonic and rum. Rum heals a little, but too much makes you drunk (reversed controls, a sluggish horse, a wobbling sail).',
+'Inventory from the weapon wheel: papers, horse tonic and rum. Rum heals a little, but too much makes you drunk (reversed controls, a sluggish horse, a wobbling sail).',
 'Custom wardrobe: coat, trim, skin and hat, saved with your game.',
 'Ships now answer your call near the shore or the nearest dock on your island.',
 'Bow chaser cannons only swivel a few degrees, and the swivel cannon fires from the same spot at the bow.',
@@ -3553,8 +3781,12 @@ const CHANGELOG=[
 {v:39,d:'Earlier',n:[
 'Cloud saves with email sign-in, installable app (PWA), controller and touch support, music and sound volumes.']}
 ];
-const BB_V={main:48,tester:48},BB_DATE='Oct 13, 2026';
-const SAVE_KEY='blackwaterbay.save.v1';
+const BB_V={main:73,tester:73},BB_DATE='Oct 15, 2026';
+// Online preview: the base world with no story quests, on its own save slot. There is no server yet; NET is the hook for one.
+const ONLINE=(()=>{try{return localStorage.getItem('blackwaterbay.online')==='1';}catch(e){return false;}})();
+const NET={status:ONLINE?'offline preview':'off',url:'',players:[]};
+function setOnline(on){try{if(on)localStorage.setItem('blackwaterbay.online','1');else localStorage.removeItem('blackwaterbay.online');}catch(e){}try{location.reload();}catch(e){}}
+const SAVE_KEY='blackwaterbay.save.v1'+(ONLINE?'.online':'');
 let saveIndT=0;
 function saveInd(msg){const el=$('saveInd');el.textContent=msg;el.classList.add('show');clearTimeout(saveIndT);saveIndT=setTimeout(()=>el.classList.remove('show'),1700);}
 function readSave(){try{const r=localStorage.getItem(SAVE_KEY);if(!r)return null;const d=JSON.parse(r);return d&&d.v===1?d:null;}catch(e){return null;}}
@@ -3562,8 +3794,8 @@ function writeSave(manual){
   if(G.state!=='play'||player.dead)return false;
   try{
     const P=player;
-    const data={v:1,t:Date.now(),gold:G.gold,hp:P.hp,maxhp:P.maxhp,x:P.x,y:P.y,tod:G.tod,done:G.done,upg:G.upg,ammo:G.ammo,owned:G.owned,melee:G.melee,gun:G.gun,carry:G.carry,look:G.look,kills:G.kills,won:G.won,story:G.story,
-      mission:mission?mission.idx:null,chests:G.chestsTaken,onShip:-1,ships:[],steed:G.steed?Object.assign(recOf(G.steed),{x:G.steed.x,y:G.steed.y,follow:!!G.steed.follow}):null,stable:G.stable,items:G.items,wrecks:G.wrecks,fleet:1};
+    const data={v:1,t:Date.now(),gold:G.gold,hp:P.hp,maxhp:P.maxhp,x:P.x,y:P.y,tod:G.tod,done:G.done,upg:G.upg,ammo:G.ammo,owned:G.owned,melee:G.melee,gun:G.gun,carry:G.carry,look:G.look,kills:G.kills,won:G.won,story:G.story,tut:G.tut,
+      mission:mission?mission.idx:null,chests:G.chestsTaken,onShip:-1,ships:[],steed:G.steed?Object.assign(recOf(G.steed),{x:G.steed.x,y:G.steed.y,follow:!!G.steed.follow}):null,stable:G.stable,items:G.items,priv:G.privateer,opening:G.opening,cdone:G.contractsDone,stumps:G.stumps,wday:G.worldDay,wrecks:G.wrecks,fleet:1};
     for(const sh of ships){if(sh.dead||sh.fac!=='pirate')continue;if(sh===P.ship)data.onShip=data.ships.length;data.ships.push({type:sh.type,x:sh.x,y:sh.y,a:sh.a,hp:sh.hp,maxhp:sh.maxhp,own:!!sh.own,name:sh.name||'',mods:sh.mods,conq:!!sh.conq});}
     localStorage.setItem(SAVE_KEY,JSON.stringify(data));
     saveInd(manual?'Game saved':'Autosaved');
@@ -3612,7 +3844,9 @@ function applySave(d){
   if(cur){P.ship=cur;cur.crew='player';P.x=cur.x;P.y=cur.y;}
   G.heat=0;G.lastSeen=null;G.deck=null;G.grap=null;harps.length=0;
   G.wrecks=Array.isArray(d.wrecks)?d.wrecks.filter(w=>w&&ST[w.type]).slice(0,3):[];
-  G.items=Object.assign({tonic:1,feed:0,rum:0,papers:0},d.items);
+  G.items=Object.assign({tonic:1,feed:0,rum:0,papers:0,lumber:0},d.items);
+  G.privateer=!!d.priv;G.opening=!!d.opening;G.contractsDone=d.cdone|0;G.marque=0;G.offers=null;
+  G.stumps=Array.isArray(d.stumps)?d.stumps:[];G.worldDay=+d.wday||0;for(const st of G.stumps)if(decor[st.i]>=9||decor[st.i]===0)decor[st.i]=5;
   G.stable=Array.isArray(d.stable)?d.stable.filter(r=>r&&BREEDS[r.breed]).slice(0,3):[];
   if(d.steed&&G.steed){
     const h=G.steed;applyRec(h,d.steed);h.follow=!!d.steed.follow;
@@ -3620,7 +3854,7 @@ function applySave(d){
     else{const sp=landSpotNear(P.x,P.y,60,200)||landSpotNear(START.x,START.y,50,110);if(sp){h.x=sp.x;h.y=sp.y;}}
     h.home={x:h.x,y:h.y};h.tx=h.x;h.ty=h.y;h.ridden=false;h.summoned=false;h.followRun=false;
   }
-  G.story=Object.assign({s:0,haleDead:false},d.story||{});G.dlg=null;G.arrest=null;
+  G.story=Object.assign({s:0,haleDead:false},d.story||{});G.tut=(d.tut&&typeof d.tut.s==='number')?d.tut:{s:99,st:0};G.dlg=null;G.arrest=null;
   if(d.mission!=null){const def=missionDef(d.mission);mission={def,idx:d.mission,stage:0,n:0};def.start(mission);}
   storySyncNpc();
   if(G.story.s===5){mission={def:STORY[5],idx:105,stage:0,n:0};startPrison();}
@@ -3634,15 +3868,13 @@ function startGame(cont){
   if(P.horse&&P.horse.dbg)P.horse=null;compact(horses,q=>!q.dbg);
   let loaded=false;
   if(cont){const d=readSave();if(d){try{applySave(d);loaded=true;}catch(e){loaded=false;}}}
-  if(!loaded){P.x=START.x;P.y=START.y;G.story={s:0,haleDead:false};G.npc=null;G.dlg=null;G.arrest=null;}
+  if(!loaded){P.x=START.x;P.y=START.y;G.story={s:0,haleDead:false};G.npc=null;G.dlg=null;G.arrest=null;tutNewGame();}
   cam.x=P.x;cam.y=P.y;cam.z=P.ship?1.0:1.45;
   G.area='';G.areaT=0;G.saveT=0;
   if(loaded){toast('Welcome back, Captain.','good');}
   else{
-    toast('WASD to walk. Find a ship at the pier and press E.');
-    setTimeout(()=>toast('Head to the tavern marker in town for a job.'),2600);
-    setTimeout(()=>toast('Your steed '+(G.steed?G.steed.name:'')+' waits nearby. Press H to call it; it will follow you. Press H again to make it wait.','good'),5000);
-    setTimeout(()=>toast('Hold E beside another ship to hijack it.'),10000);
+    toast('WASD to walk.');
+    if(ONLINE)setTimeout(()=>toast('Online preview: the open world with no server yet.'),2600);
   }
   sfx('ui');
 }
@@ -3711,6 +3943,7 @@ function showMainMenu(){
     const mk=(id,txt,cls)=>{const b=document.createElement('button');b.id=id;b.className='btn'+(cls?' '+cls:'');b.textContent=txt;return b;};
     mm.appendChild(contBtn);mm.appendChild(startBtn);
     const ctrlBtn=mk('ctrlBtn','Controls'),optBtn=mk('optBtn','Options');
+    if(ONLINE){const lb=mk('leaveOnline','Back to single player','ghost');lb.addEventListener('click',()=>setOnline(false));mm.appendChild(lb);h.textContent='Online preview';}
     mm.appendChild(ctrlBtn);mm.appendChild(optBtn);
     delBtn.classList.add('ghost');mm.appendChild(delBtn);
     const foot=document.createElement('div');foot.className='hint';foot.style.marginTop='14px';foot.textContent='Keyboard and mouse, controller or touch. Sound on for cannon fire.';
@@ -3728,26 +3961,25 @@ function showMainMenu(){
     const rows=[
       ['On foot and horse'],
       ['Move',kb('W','A','S','D'),stick('L'),''],
-      ['Sprint, gallop',kb('Shift'),stick('L3 click'),''],
+      ['Sprint, gallop (controller: toggle)',kb('Shift'),stick('L3 click'),''],
       ['Aim','Mouse',stick('R'),''],
-      ['Board, talk, enter, dig',kb('E'),xb('A','#2faa4a'),pp('x')],
-      ['Dismount, leave ship',kb('Q')+' / '+kb('F'),xb('B','#d0433a'),pp('o')],
-      ['Call steed (again to stay)',kb('H'),xb('X','#2f6fd0'),pp('s')],
-      ['Tonic (horse)',kb('V'),xb('Y','#e0b020'),pp('t')],
+      ['Talk, enter, dig',kb('E'),xb('A','#2faa4a'),pp('x')],
+      ['Mount, board, get off',kb('F'),xb('Y','#d6b020'),pp('t')],
+      ['Call steed (again to stay)',kb('Q'),'D-pad Up','D-pad Up'],
+      ['Tonic (horse)','Wheel','Wheel','Wheel'],
       ['Combat'],
-      ['Left hand (attack)',kb('Click')+' '+kb('Space'),pill('RT',34),pill('R2',34)],
-      ['Right hand (alt attack)',kb('Right-click')+' '+kb('F'),pill('LT',34),pill('L2',34)],
+      ['Left hand (attack)',kb('Click'),pill('RT',34),pill('R2',34)],
+      ['Right hand (alt attack)',kb('Right-click'),pill('LT',34),pill('L2',34)],
       ['Swap hands',kb('G'),pill('RB',34),pill('R1',34)],
       ['Weapon wheel (weapons, items, crew, steed)','Hold '+kb('Tab')+' or middle mouse','Hold '+pill('LB',34)+', pick with a stick','Hold '+pill('L1',34)],
       ['Items'],
-      ['Inventory',kb('I'),'From the wheel','From the wheel'],
-      ['Rum, ship papers','Inventory or wheel','Wheel','Wheel'],
+      ['Inventory','From the wheel','From the wheel','From the wheel'],
       ['At sea'],
       ['Sail and steer',kb('W')+' raise '+kb('S')+' lower '+kb('A')+kb('D')+' turn',stick('Up, down, left, right'),''],
-      ['Broadside (aim up to 45&deg;)',kb('Click')+' '+kb('Space'),pill('RT',34),pill('R2',34)],
+      ['Broadside (aim up to 45&deg;)',kb('Click'),pill('RT',34),pill('R2',34)],
       ['Swivel cannon, harpoon',kb('Right-click'),pill('LT',34),pill('L2',34)],
       ['Switch special',kb('R'),'Wheel','Wheel'],
-      ['Hijack a ship','Hold '+kb('E')+' alongside','Hold '+xb('A','#2faa4a'),'Hold '+pp('x')],
+      ['Hijack a ship (no hold needed)',kb('F')+' alongside',xb('Y','#d6b020'),pp('t')],
       ['Below deck: bunk, desk, stash','Wheel, Below deck','Wheel','Wheel'],
       ['World'],
       ['Map',kb('M'),pill('View',44),pill('Share',46)],
@@ -3865,10 +4097,24 @@ function padGet(){
 }
 const PADN={xbox:{A:'A',B:'B',X:'X',Y:'Y',LB:'LB',RB:'RB',LT:'LT',RT:'RT'},ps:{A:'Cross',B:'Circle',X:'Square',Y:'Triangle',LB:'L1',RB:'R1',LT:'L2',RT:'R2'}};
 function padKey(k){
-  if(!G.padOn)return k;
-  if(pad.touch)return ({E:'USE',F:'LEAVE',Q:'LEAVE',H:'CALL',V:'TONIC',R:'SWAP',T:'MELEE'})[k]||k;
+  if(!G.padOn)return k==='D'?'F':k;
+  if(pad.touch)return ({E:'USE',F:'LEAVE',D:'LEAVE',Q:'CALL',V:'TONIC',R:'SWAP',T:'MELEE'})[k]||k;
   const n=pad.ps?PADN.ps:PADN.xbox;
-  return ({E:n.A,F:n.B,Q:n.B,H:n.X,V:n.Y,R:n.LB,T:n.RB})[k]||k;
+  return ({E:n.A,F:n.Y,D:n.Y,Q:'D-pad Up',V:n.Y,R:n.LB,T:n.RB})[k]||k;
+}
+/* text that names controls follows whichever input is in use: keyboard and mouse, Xbox or PlayStation pad */
+function ctl(t){
+  if(typeof t!=='string'||!t)return t;
+  const on=G.padOn&&!pad.touch,n=pad.ps?PADN.ps:PADN.xbox;
+  const kbT={USE:'E',WHEEL:'Tab',L:'the left mouse button',R:'the right mouse button',SWAP:'G',CALL:'H',LEAVE:'Q'};
+  const pdT={USE:n.A,WHEEL:n.LB,L:n.RT,R:n.LT,SWAP:n.RB,CALL:n.X,LEAVE:n.B};
+  const T=on?pdT:kbT;
+  t=t.replace(/\{(USE|WHEEL|L|R|SWAP|CALL|LEAVE)\}/g,(m,k)=>T[k]);
+  if(on){
+    t=t.replace(/\b(press|hold) E\b/gi,(m,a)=>a+' '+n.A).replace(/\(E\)/g,'('+n.A+')').replace(/\bE: /g,n.A+': ')
+       .replace(/\bTab\b/g,n.LB).replace(/\(LMB\)/g,'('+n.RT+')').replace(/(the )?left mouse button/gi,n.RT).replace(/(the )?right mouse button/gi,n.LT).replace(/right mouse/gi,n.LT);
+  }
+  return t;
 }
 function padLabelHTML(v){
   if(pad.touch)return v.replace(/<b>G<\/b>/g,'<b>SWAP</b>').replace(/<b>LMB<\/b>/g,'<b>FIRE</b>').replace(/<b>RMB<\/b>/g,'<b>ALT</b>').replace(/<b>Tab<\/b>wheel/g,'<b>WHEEL</b>').replace(/<b>F<\/b>Leave/g,'<b>LEAVE</b>').replace(/<span style="opacity:\.7">.*?<\/span>/g,'');
@@ -3908,7 +4154,7 @@ function padMouse(f,want){
 }
 function padReleaseAll(){
   pad.sm=0;pad.fm=0;
-  for(const c of ['KeyW','KeyA','KeyS','KeyD','ShiftLeft','KeyE'])padHold(c,false);
+  for(const c of ['KeyW','KeyA','KeyS','KeyD','ShiftLeft','KeyE','KeyF'])padHold(c,false);
   padMouse('down',false);padMouse('rdown',false);
 }
 function padShopNav(g,dt,press,ly){
@@ -3934,6 +4180,7 @@ function padMenu(root,dt,press,lx,ly,onBack){
   else if(pad.navT<=0&&Math.max(Math.abs(lx),Math.abs(ly))>0.6){d=(ly>0.6||lx>0.6)?1:-1;pad.navT=0.25;}
   if(d)pad.mi=(pad.mi+d+btns.length)%btns.length;
   btns.forEach((b,i)=>b.classList.toggle('padsel',i===pad.mi));
+  if(d){try{btns[pad.mi].scrollIntoView({block:'nearest'});}catch(e){}}
   if(press(0)||press(9))btns[pad.mi].click();
   else if(press(1)&&onBack)onBack();
 }
@@ -3990,7 +4237,9 @@ function padPoll(dt){
     for(const c of ['KeyW','KeyA','KeyS','KeyD'])padHold(c,false);
     if(lm>DZ){const m=Math.min(1,(lm-DZ)/(1-DZ)+0.2);pad.fm=m;pad.fx=lx/lm;pad.fy=ly/lm;}else pad.fm=0;
   }
-  padHold('ShiftLeft',b(10));padHold('KeyE',b(0));
+  if(press2(10)){pad.run=!pad.run;toast(pad.run?'Run on':'Run off');}
+  if(lm<DZ&&pad.run&&!pad.touch){pad.run=false;}
+  padHold('ShiftLeft',!!pad.run);padHold('KeyE',b(0));padHold('KeyF',b(3));
   padMouse('down',b(7));padMouse('rdown',b(6));
   // aim with restricted reach
   const R=padRange();
@@ -3999,12 +4248,9 @@ function padPoll(dt){
   if(WHEEL.padStep(press2,b,rx,ry,lx,ly))return;
   // actions
   if(press2(0))onKey('KeyE');
-  if(press2(1)){if(player.ship)onKey('KeyF');else if(player.horse)onKey('KeyQ');}
-  if(press2(2))onKey('KeyH');
+  if(press2(12))onKey('KeyQ');
   if(press2(5))onKey('KeyG');
-  if(press2(3))onKey('KeyV');
-  if(b(12))G.zoomMul=clamp(G.zoomMul*(1+dt*0.9),0.6,1.6);
-  if(b(13))G.zoomMul=clamp(G.zoomMul*(1-dt*0.9),0.6,1.6);
+  if(press2(3))rideToggle();
 }
 
 /* ---- touch controls ---- */
@@ -4249,7 +4495,7 @@ function mkSceneBase(kind){
 function sceneLoadLevel(D,i,arrive){
   const L=D.levels[i];D.lv=i;D.L=L;
   D.grid=L.grid;D.W=L.W;D.H=L.H;D.pw=L.W*TS;D.ph=L.H*TS;D.enemies=L.enemies;D.pick=L.pick;D.corpses=L.corpses;D.torches=L.torches;D.explored=L.explored;
-  D.bullets.length=0;D.bombs.length=0;D.flow=null;D.flowT=0;D.hold=null;
+  D.bullets.length=0;D.bombs.length=0;D.flow=null;D.flowT=0;D.hold=null;D.stairArm=null;
   const sp=arrive==='up'&&L.down?{x:L.down.x-TS*1.5,y:L.down.y}:arrive==='down'&&L.up&&!L.up.exit?{x:L.spawn.x,y:L.spawn.y}:L.spawn;
   D.p.x=sp.x;D.p.y=sp.y;
   if(gridHit(D,D.p.x,D.p.y,8)){let fixed=false;for(let r=1;r<8&&!fixed;r++)for(let dy=-r;dy<=r&&!fixed;dy++)for(let dx=-r;dx<=r;dx++){const x=sp.x+dx*TS,y=sp.y+dy*TS;if(!gridHit(D,x,y,8)){D.p.x=x;D.p.y=y;fixed=true;break;}}}
@@ -4420,7 +4666,7 @@ function updateScene(dt){
   if(l>0){P.walk+=dt*spd/55;deckMove(D,p,dx*spd*dt,dy*spd*dt,7);}
   D.pa=Math.atan2(mouse.wy-p.y,mouse.wx-p.x);
   if(!D.unarmed){
-    handUse(0,D,mouse.down||keys.Space);handUse(1,D,mouse.rdown||keys.KeyF);
+    handUse(0,D,mouse.down);handUse(1,D,mouse.rdown);
     if(D.hitIn>0){D.hitIn-=dt;if(D.hitIn<=0)deckMelee(D);}
   }else if(mouse.rdown&&D.scene==='prison'&&P.reload<=0)prisonThrow(D);
   // exploration map
@@ -4520,6 +4766,7 @@ function sceneInteract(D){
         if(Math.random()<0.5){G.ammo.shot=Math.min(AMMO_MAX.shot,(G.ammo.shot||0)+8);toast('+8 powder and shot','good');}
       }});
     }
+    if(D.retrieve&&L.body&&!D.hasBody){const d=Math.hypot(L.body.x-p.x,L.body.y-p.y);if(d<56)consider({d,id:'hale',hold:1.4,label:'Hold E to lift Lt. Hale\'s body',run(){D.hasBody=true;L.corpses.length=0;G.story.letter=true;if(mission&&mission.idx===107)mission.stage=2;sfx('ui');say([{who:'',txt:'He is cold and light. His coat is torn open across the chest, and the claw marks are deep.'},{who:'',txt:'Something is folded in his breast pocket: a sealed letter in his own hand, addressed to the King.'},{who:'',txt:'Behind you, the dark begins to move.'}],()=>lairAmbush(D));}});}
     if(D.portal){const d=Math.hypot(D.portal.x-p.x,D.portal.y-p.y);if(d<52)consider({d,id:'portal',label:'Step into the light',run(){exitDungeon(true);}});}
   }
   if(D.scene==='prison')prisonInteract(D,consider);
@@ -5129,7 +5376,7 @@ function say(lines,done){
 function dlgShow(){
   const D=G.dlg;if(!D)return;
   const l=D.lines[D.i];D.shown=0;D.sel=0;
-  dlgN.textContent=l.who||'';dlgN.style.color=(l.who||'').startsWith('Lt')?'#9fd0ff':(l.who||'').startsWith('King')?'#ffd75a':'#f4c542';
+  l.txt=ctl(l.txt);dlgN.textContent=l.who||'';dlgN.style.color=(l.who||'').startsWith('Lt')?'#9fd0ff':(l.who||'').startsWith('King')?'#ffd75a':'#f4c542';
   dlgT.textContent='';dlgC.innerHTML='';dlgH.style.display='';
 }
 function dlgTick(dt){
@@ -5174,6 +5421,7 @@ function dlgKey(c){
 dlgEl.addEventListener('click',()=>dlgAdvance());
 /* ================= story state ================= */
 G.story={s:0,haleDead:false};
+G.tut={s:99,st:0};
 G.npc=null;
 const KING_NAME='King Aldric',HALE_NAME='Lt. Edmund Hale';
 const STORY={};
@@ -5184,7 +5432,7 @@ function startStoryMission(n){
   banner(def.title,'New quest');toast(def.brief);sfx('ui');storySyncNpc();
 }
 function completeStory(n,gold,next){
-  const m=mission;mission=null;
+  const m=mission;mission=null;if(G.tut&&n>=11&&n<=16)G.tut.st=0;
   if(gold){gainGold(gold);banner(STORY[n].title,'Complete  +'+gold+' gold');}else banner(STORY[n].title,'Complete');
   sfx('coin');storySyncNpc();
   if(next)later(2.5,()=>{if(!mission&&G.state==='play')startStoryMission(next);});
@@ -5193,10 +5441,10 @@ function storySyncNpc(){
   const s=G.story.s;
   if(s===2&&SENT)G.npc={id:'hale',x:SENT.spot.x,y:SENT.spot.y,a:PI/2,name:HALE_NAME,talk:haleTalk};
   else if(s===3&&!G.story.haleDead&&GRAVE)G.npc={id:'hale',x:GRAVE.hale.x,y:GRAVE.hale.y,a:-PI/2,name:HALE_NAME,talk:haleTalk};
-  else G.npc=null;
+  else G.npc=tutNpc();
 }
 function storyTick(dt){
-  if(G.state!=='play'||player.dead||G.dlg)return;
+  if(ONLINE||G.state!=='play'||player.dead||G.dlg)return;
   const st=G.story;
   if(st.s===0&&!mission&&(G.done>=3||G.won)){
     G.storyWait=(G.storyWait===undefined?5:G.storyWait)-dt;
@@ -5207,7 +5455,7 @@ function throneZone(){return zones.find(z=>z.kind==='throne');}
 /* ---- 1. the summons ---- */
 STORY[1]={title:"The King's Summons",brief:'A royal messenger demands your presence at Crown Rock Castle.',story:true,
   start(m){m.stage=0;},
-  obj(m){return "Answer the King's summons at Crown Rock";},
+  obj(m){return "Answer the King's summons: enter the castle and speak to the King";},
   target(m){const z=throneZone();return z?{x:z.x,y:z.y}:null;},
   onThrone(m){
     say([
@@ -5250,7 +5498,7 @@ STORY[3]={title:'Into the Gravemaw',brief:'Fight through three levels of the cry
   onFail(m){m.stage=0;G.story.haleDead=false;storySyncNpc();}};
 STORY[4]={title:'Report to the King',brief:'Return to Crown Rock and tell the King what happened in the Gravemaw.',story:true,
   start(m){m.stage=0;},
-  obj(m){return 'Report to the King at Crown Rock';},
+  obj(m){return 'Enter Crown Rock castle and report to the King';},
   target(m){const z=throneZone();return z?{x:z.x,y:z.y}:null;},
   onThrone(m){
     say([
@@ -5268,7 +5516,7 @@ function storyArrest(){
   const P=player;mouse.down=false;mouse.rdown=false;
   // guards rush in around the player
   const z=throneZone();
-  for(let k=0;k<6;k++){const a=k/6*TAU,x=P.x+Math.cos(a)*70,y=P.y+Math.sin(a)*70;mkFolk('soldier',x,y,{st:'chase',reinforce:true,law:true});}
+  if(!G.deck)for(let k=0;k<6;k++){const a=k/6*TAU,x=P.x+Math.cos(a)*70,y=P.y+Math.sin(a)*70;mkFolk('soldier',x,y,{st:'chase',reinforce:true,law:true});}
   G.arrest={t:0};
 }
 function storyArrestTick(dt){
@@ -5343,17 +5591,320 @@ STORY[6]={title:'Fugitive of the Crown',brief:'The Crown blames you for Lt. Hale
     }else if(m.t>8&&G.heat<=0){G.heat=Math.max(G.heat,30);}
   },
   onFail(m){m.redo=true;}};
+/* ---- 7. clear your name: bring Hale home, earn the commission (single player; started from the debug menu for now) ---- */
+const caveZone=()=>zones.find(z=>z.kind==='cave');
+STORY[7]={title:'Clear Your Name',brief:'Return to the Gravemaw, recover Lt. Hale\'s body and carry it into the castle to the King.',story:true,
+  start(m){
+    m.stage=G.story.body?3:0;
+    if(!G.story.intro7&&!G.story.body){G.story.intro7=true;later(0.8,()=>say([
+      {who:'',txt:'Weeks have passed. The Navy still posts your name on every harbour wall: the pirate who murdered the King\'s own nephew.'},
+      {who:'',txt:'You know the truth, and the truth is lying in the dark under Gravemaw Isle, where the beast took him. The Crown will not hang a man over a body it cannot show.'},
+      {who:'',txt:'Sailors whisper that the great stone door has cracked open since the Gravemaw fell. Go back. Bring Lt. Hale home. Make the King look at what really killed him.'}]));}
+  },
+  obj(m){return m.stage>=3?'Carry Lt. Hale into Crown Rock castle and speak to the King':m.stage>=1?'Recover Lt. Hale\'s body from the Gravemaw':'Return to the Gravemaw and recover Lt. Hale\'s body';},
+  target(m){if(m.stage>=3){const z=throneZone();return z?{x:z.x,y:z.y}:null;}if(m.stage>=1)return null;const z=caveZone();return z?{x:z.x,y:z.y}:null;},
+  onThrone(m){
+    if(m.stage<3){
+      say([{who:KING_NAME,txt:'You again. Unless you carry my nephew home, you have nothing to say that I wish to hear.'},
+           {who:'',txt:'Return to the Gravemaw and bring Lt. Hale\'s body to the King.'}]);return;
+    }
+    say([
+      {who:'',txt:'Two guards unwrap the sailcloth in the middle of the throne room. The court goes silent.'},
+      {who:KING_NAME,txt:'Edmund.'},
+      {who:KING_NAME,txt:'Those wounds. Claws as long as my arm. No cutlass did this, and no pirate\'s pistol. The beast did. He died exactly as you said.'},
+      {who:'',txt:'You hand over the sealed letter you found in Hale\'s coat. The King breaks the wax and reads it slowly. His hand is not steady.'},
+      {who:KING_NAME,txt:'"Uncle. If you read this, I did not come back. The pirate is not my murderer. He fought for me longer than I deserved. Pay him, and forgive the Dominion. I was never brave. I only stood where I was told."'},
+      {who:KING_NAME,txt:'He was braver than all of my court together.'},
+      {who:KING_NAME,txt:'I called you a murderer, Captain, before my whole court. I do not apologise. A king cannot. But I do not forget a debt, and I do not forget a letter.'},
+      {who:KING_NAME,txt:'The Navy cannot be seen to hunt the pirate lords bleeding my trade. A privateer can. Take this letter of marque. Sink the ones I name. Take the captains I ask for alive. The Crown will pay you well.',choices:[
+        {t:'A letter of marque, Majesty? I accept.',reply:[{who:KING_NAME,txt:'Good. The contract board is at the desk of your own ship. Do not make me regret it.'}]},
+        {t:'My name is clear, then.',reply:[{who:KING_NAME,txt:'Clear enough to sail under my flag. Do not push it, Captain.'}]}]},
+      {who:KING_NAME,txt:'While a contract runs, my Navy will leave you be. The pirate towns will not. Remember that.'},
+    ],()=>{G.privateer=true;G.heat=0;G.story.s=8;G.story.body=false;G.story.letter=false;completeStory(7,800,0);later(2.5,()=>banner('LETTER OF MARQUE','Privateer contracts unlocked at your captain\'s desk'));});
+  }};
+function popLairRetrieve(D,L){
+  const T={grid:L.grid,W:L.W,H:L.H,pw:L.W*TS,ph:L.H*TS,enemies:[]};
+  for(const [x,y] of [[16,20],[22,21],[27,20]]){mkMonster(T,'skel',(x+0.5)*TS,(y+0.5)*TS);L.enemies.push(T.enemies.pop());}
+  L.pick.push({type:'rum',x:8*TS,y:23*TS},{type:'ammo',x:10*TS,y:19*TS},{type:'rum',x:29*TS,y:21*TS});
+  L.body={x:L.arena.x,y:L.arena.y};
+  L.corpses.push({x:L.arena.x,y:L.arena.y,a:0.4,coat:'#2f4a78',coat2:'#e8e2d0',hat:'tricorn',scale:1});
+}
+function popCryptExtra(D,L){
+  const T={grid:L.grid,W:L.W,H:L.H,pw:L.W*TS,ph:L.H*TS,enemies:[]};
+  const free=(x,y,r)=>!gridHit(T,x,y,r);
+  L.rooms.forEach((r,i)=>{if(i===0)return;const kinds=i%2?['cultist','skel']:['ghoul','archer'];
+    for(const k of kinds)for(let t=0;t<30;t++){const x=(r.x+1+Math.random()*(r.w-2))*TS,y=(r.y+1+Math.random()*(r.h-2))*TS;if(free(x,y,12)&&Math.hypot(x-L.spawn.x,y-L.spawn.y)>260){mkMonster(T,k,x,y);L.enemies.push(T.enemies.pop());break;}}});
+}
+function lairAmbush(D){
+  const L=D.L,T={grid:L.grid,W:L.W,H:L.H,pw:L.W*TS,ph:L.H*TS,enemies:[]};D.ambush=[];
+  const kinds=['ghoul','ghoul','ghoul','ghoul','cultist','cultist'];
+  kinds.forEach((k,i)=>{const a=Math.PI*0.5+i/kinds.length*TAU,x=L.arena.x+Math.cos(a)*8*TS,y=L.arena.y+Math.sin(a)*8*TS;
+    mkMonster(T,k,x,y);const m=T.enemies.pop();m.alert=true;L.enemies.push(m);D.ambush.push(m);});
+  banner('THE BROOD STIRS','They guard what is left of the Gravemaw');sfx('boom');G.shake=7;
+}
+function patrolHunt(){
+  const P=player;G.heat=Math.max(G.heat,55);G.lastSeen={x:P.x,y:P.y};G.unseen=0;
+  for(const t of ['cutter','sloop']){for(let k=0;k<40;k++){const a=rr(0,TAU),r=rr(700,1100),x=P.x+Math.cos(a)*r,y=P.y+Math.sin(a)*r;
+    if(tileAt(x,y)===0&&shipFree(x,y,0,ST[t])){mkShip(t,'navy',x,y,Math.atan2(P.y-y,P.x-x),'ai');break;}}}
+  later(2.5,()=>toast('Navy patrols are still hunting the pirate who murdered Hale. Reach Crown Rock alive.','bad'));
+}
+function startRetrieval(){
+  const P=player;if(P.horse)dismount();
+  const D=mkSceneBase('dun'),seed=(Math.random()*1e9)|0;
+  const c0=genCrypt(seed+11,0),L=genLair(seed+37);
+  popCrypt(D,c0,0);popCryptExtra(D,c0);popLairRetrieve(D,L);c0.name=c0.name||'The Upper Crypt';
+  D.levels=[c0,L];D.retrieve=true;D.sceneName='Beneath the Gravemaw';
+  G.deck=D;sceneLoadLevel(D,0,'down');
+  D.cam.z=clamp(Math.min(VW,VH)/620,0.85,1.5);D.cam.x=D.p.x;D.cam.y=D.p.y;
+  closeShop();G.board=null;G.grap=null;mouse.down=false;mouse.rdown=false;parts.length=0;
+  if(mission&&mission.idx===107)mission.stage=1;
+  banner('THE GRAVEMAW','The stone door hangs open');sfx('boom');G.shake=4;
+  later2(D,1.4,()=>say([{who:'',txt:'The crypt is not empty. The cult that woke the beast kept their shrines here. Their candles have burned down to the nub, but someone still walks these halls.'}]));
+  return D;
+}
+/* ================= tutorial chain (single player and online): Washed Ashore, Sea Legs, Papers Please, First Command ================= */
+let tutH=null,tutLoan=null,tutStolen=null,tutBuoy=null,tutRaider=null;
+const tutPos={};
+const tutZ=k=>{const a=zones.filter(z=>z.kind===k);a.sort((p,q)=>dist(p.x,p.y,START.x,START.y)-dist(q.x,q.y,START.x,START.y));return a[0]||null;};
+function tutSpot(key,z,dx,dy){if(!tutPos[key]){const sp=landSpotNear(z.x+dx,z.y+dy,6,50);tutPos[key]=sp||{x:z.x+dx,y:z.y+dy};}return tutPos[key];}
+function tutNpc(){
+  const T=G.tut;if(!T||T.s>=99)return null;
+  const s=T.s,st=T.st|0,tav=tutZ('tavern'),pier={x:START.x,y:START.y};
+  const mk=(id,name,z,dx,dy,coat,coat2,hat)=>{if(!z)return null;const p=tutSpot(id,z,dx,dy);return {id,x:p.x,y:p.y,a:PI/2,name,coat,coat2,hat,skin:'#d9a878',talk:tutTalk};};
+  if(s===1&&st===0)return mk('silas','Silas',tav,0,70,'#6b4a2b','#d8c9a0','bandana');
+  if(s===2&&st>=1)return mk('brand','Sergeant Brand',tav,-80,60,'#7a2a2a','#e8e2d0','tricorn');
+  if(s===3&&st===2)return mk('mercer','Mercer',pier,60,-10,'#3a3a46','#c0a060','tricorn');
+  if(s===4&&st===0)return mk('pell','Harbourmaster Pell',pier,-60,-10,'#2f4a78','#e8e2d0','tricorn');
+  if(s===5)return mk('pass','Dockhand',tav,70,50,'#556b3a','#d8c9a0','bandana');
+  return null;
+}
+function tutStage(m,k){m.stage=k;G.tut.st=k;storySyncNpc();sfx('ui');}
+function tutHorse(){
+  if(tutH&&horses.includes(tutH)&&tutH.wild&&!tutH.mine)return tutH;
+  const z=tutZ('stable')||tutZ('tavern');if(!z)return null;
+  const sp=landSpotNear(z.x,z.y,70,140)||{x:z.x+80,y:z.y+60};
+  const h=mkHorse(sp.x,sp.y);h.wild=true;wildBreed(h);tutH=h;return h;
+}
+function tutOwnShip(){return ships.find(s=>s.own&&s.fac==='pirate'&&!s.dead)||null;}
+function tutRemoveShip(s){if(!s)return;if(player.ship===s)leaveShip();s.dead=true;s.hp=0;s.crew=null;}
+const SIL='Silas',BRA='Sgt. Brand',MER='Mercer',PEL='Harbourmaster Pell';
+
+/* 1. Washed Ashore */
+STORY[11]={title:'Washed Ashore',brief:'A stranger found you on the beach. Get to the Rusty Anchor and recover.',story:true,tut:true,
+  start(m){
+    G.tut.s=1;m.stage=G.tut.st|0;if(m.stage===2)tutHorse();
+    if(!G.tut.intro&&m.stage===0){G.tut.intro=true;later(0.8,()=>say([
+      {who:'',txt:'Salt water. Sand in your mouth. Everything hurts, and the surf is still tugging at your boots.'},
+      {who:SIL,txt:'Easy, easy. Do not try to stand. You washed up half drowned and bleeding all down your side. I have hauled up bodies in better shape.'},
+      {who:SIL,txt:'Name is Silas. I keep an eye on the docks. Wherever you came from, you are in Tortuga now, and nobody here asks questions that cost less than a drink.'},
+      {who:SIL,txt:'Can you walk? Good. The Rusty Anchor is just up the way. Get some food in you. I will be right behind.'}]));}
+  },
+  obj(m){return ['Go into the Rusty Anchor tavern','Eat a meal at the tavern table (E)','Tame the wild horse near the stable (hold '+padKey('D')+' beside it)'][m.stage]||'';},
+  target(m){if(m.stage===0){const z=tutZ('tavern');return z?{x:z.x,y:z.y}:null;}if(m.stage===2&&tutH)return {x:tutH.x,y:tutH.y};return null;},
+  onEat(m){if(m.stage===1)this.healed(m);},
+  healed(m){tutStage(m,2);tutHorse();say([{who:SIL,txt:'There is some colour back in your face. Round the back of town a wild horse has been grazing by the stable. Walk up and hold '+padKey('D')+' beside it until it calms. A steed will save your legs.'}]);},
+  poll(m){
+    if(m.stage===0&&G.deck&&G.deck.zone&&G.deck.zone.kind==='tavern'){tutStage(m,1);say([{who:SIL,txt:'Sit. Eat. Step up to the table and press E for a meal. It will put some strength back in you.'}]);}
+    if(m.stage===1&&!G.deck&&player.hp>=player.maxhp)this.healed(m);
+    if(m.stage===2){
+      if(!tutH||!horses.includes(tutH))tutHorse();
+      if(G.steed&&G.steed.mine){
+        player.hp=player.maxhp;
+        say([{who:SIL,txt:'Well, look at that. The horse likes you. Rested, fed and mounted, and you were half a corpse this morning.'},
+             {who:SIL,txt:'Now, a pirate needs a blade. The Armory is down the street. Buy something cheap, you have sixty gold. Tell the keeper Silas sent you.'}],()=>{G.tut.st=0;completeStory(11,0,12);});
+        m.stage=9;
+      }
+    }
+  }};
+
+/* 2. Sea Legs */
+STORY[12]={title:'Sea Legs',brief:'Buy a blade at the Armory, then let Sergeant Brand teach you to fight.',story:true,tut:true,
+  start(m){
+    G.tut.s=2;m.stage=G.tut.st|0;
+    if(!G.tut.pre){G.tut.pre={owned:Object.assign({},G.owned),ammo:Object.assign({},G.ammo)};G.tut.gold0=G.gold;}
+    if(m.stage>=1)storySyncNpc();
+  },
+  obj(m){return ['Buy a weapon at the Armory','Talk to Sergeant Brand by the tavern','Hold Tab for the weapon wheel: blade in one hand, Throwing Knives in the other','Throw a knife with the hand that holds them','Swing your blade with the other hand','Open the wheel and choose From stash (stand by your steed)','Report back to Sergeant Brand'][m.stage]||'';},
+  target(m){if(m.stage===0){const z=tutZ('armory');return z?{x:z.x,y:z.y}:null;}if(m.stage===1||m.stage===6)return G.npc?{x:G.npc.x,y:G.npc.y}:null;return null;},
+  poll(m){
+    const T=G.tut,pre=T.pre||{owned:{}};
+    if(m.stage===0){
+      if(Object.keys(G.owned).some(k=>G.owned[k]&&!pre.owned[k]&&isCarryCat(k))){
+        tutStage(m,1);
+        say([{who:'Armory keeper',txt:'Good choice. Though a blade is no use if you swing it like a fishwife.'},{who:'Armory keeper',txt:'Sergeant Brand drills recruits by the tavern. Go and see him. Tell him I sent you.'}]);
+      }
+    }else if(m.stage===2){
+      if(G.carry.includes('knives')&&G.carry.some(k=>WEAP[k]&&WEAP[k].cat==='melee')){tutStage(m,3);T.k0=G.ammo.knives|0;toast('Now throw a knife.','good');}
+    }else if(m.stage===3){
+      if((G.ammo.knives|0)<(T.k0|0)){tutStage(m,4);toast('Good throw. Now swing your blade.','good');}
+    }else if(m.stage===4){
+      if(player.swing>0&&G.carry.some(k=>WEAP[k]&&WEAP[k].cat==='melee')){tutStage(m,5);toast('Nice swing. Last lesson: the stash.','good');}
+    }
+  },
+  onStash(m){if(m.stage===5){tutStage(m,6);toast('Weapons you are not carrying stay in the stash. Report back to Brand.','good');}}};
+
+/* 3. Papers, Please */
+STORY[13]={title:'Papers, Please',brief:'A stranger at the shipyard knows a way to get a ship.',story:true,tut:true,
+  start(m){G.tut.s=3;m.stage=G.tut.st|0;if(m.stage===1)tutLoaner();storySyncNpc();},
+  obj(m){return ['Go to the shipyard and look around','Take Mercer\'s sloop, harpoon a ship, board her and win the fight (or press '+padKey('D')+' alongside to hijack a merchant)','Talk to Mercer at the Tortuga pier'][m.stage]||'';},
+  target(m){if(m.stage===0){const z=tutZ('shipyard');return z?{x:z.x,y:z.y}:null;}if(m.stage===2)return {x:START.x,y:START.y};return null;},
+  onHijack(m,s){this.stolen(m,s);},
+  onCapture(m,s){this.stolen(m,s);},
+  stolen(m,s){
+    if(m.stage!==1)return;
+    tutStolen=s;if(player.ship)leaveShip();
+    const P=player;P.x=START.x;P.y=START.y;P.vx=P.vy=0;cam.x=P.x;cam.y=P.y;P.invuln=Math.max(P.invuln,1);
+    tutStage(m,2);toast('Ship stolen. Mercer is waiting at the Tortuga pier.','good');
+  },
+  poll(m){if(m.stage===1&&tutLoan&&tutLoan.dead&&!tutStolen){tutLoan=null;tutLoaner();toast('Mercer has put his sloop back at the pier.');}}};
+function tutLoaner(){
+  if(tutLoan&&!tutLoan.dead)return tutLoan;
+  const sh=spawnDockShip('sloop',TPIER);sh.mods={bow:0,all:0,harp:1,vol:0};sh.name="Mercer's Sloop";sh.keep=true;sh.sel=0;tutLoan=sh;return sh;
+}
+function tutStranger(D){
+  const m=mission;if(!m||!m.def.tut||G.tut.s!==3||m.stage!==0){say([{who:MER,txt:'Quiet day for ships.'}]);return;}
+  say([
+    {who:MER,txt:'Psst. You are looking at those hulls like a man who cannot afford one.'},
+    {who:MER,txt:'Here is something the Royal Registry will not tell you. There is a back room trade in ship papers. A clerk I know files them without a single question. For the right price.'},
+    {who:MER,txt:'I will cover the fee on your first one. Call it a favour. In return, a small job. My sloop is at the pier with a harpoon on her bow. Take her out, hook a ship, climb aboard and bring it back. I will sell it on.'},
+    {who:MER,txt:'One more thing, free of charge. A sailor can always chop down a tree for wood. Crews mend a hull for lumber and gold while you sleep in the captain\'s bunk. Remember that.'}
+  ],()=>{tutLoaner();tutStage(m,1);toast('Mercer\'s sloop waits at the pier. Board her with E.','good');});
+}
+
+/* 4. First Command */
+STORY[14]={title:'First Command',brief:'Harbourmaster Pell drills new captains on the guns.',story:true,tut:true,
+  start(m){
+    G.tut.s=4;m.stage=G.tut.st|0;
+    if(!tutOwnShip()){const sh=spawnDockShip('cutter',TPIER);registerShip(sh,true);}
+    if(m.stage>=1)tutArm();
+    if(m.stage>=2)tutBuoyMake();
+    if(m.stage>=6)tutRaiderMake();
+  },
+  obj(m){return ['Talk to Harbourmaster Pell','Board your Cutter at the pier','Steer out to the marked buoy','Fire your broadside and bow guns (LMB)','Fire the 360 swivel with the right mouse button','Fire the harpoon with the right mouse button','Sink the practice raider'][m.stage]||'';},
+  target(m){if(m.stage===0)return G.npc?{x:G.npc.x,y:G.npc.y}:null;if(m.stage===1){const s=tutOwnShip();return s?{x:s.x,y:s.y}:null;}if(m.stage===2&&tutBuoy)return tutBuoy;if(m.stage===6&&tutRaider&&!tutRaider.dead)return {x:tutRaider.x,y:tutRaider.y};return null;},
+  poll(m){
+    const P=player,s=P.ship,T=G.tut;
+    if(m.stage===1&&s&&s.own){tutStage(m,2);tutBuoyMake();}
+    else if(m.stage===2&&s&&tutBuoy&&dist(s.x,s.y,tutBuoy.x,tutBuoy.y)<150){tutStage(m,3);toast('At the buoy. Fire your guns.','good');}
+    else if(m.stage===3&&s&&(s.cd[0]>0.2||s.cd[1]>0.2)){tutStage(m,4);const l=specials(s);s.sel=Math.max(0,l.indexOf('all'));toast('Broadside away. Now the swivel (right mouse).','good');}
+    else if(m.stage===4&&s&&s.scd.all>SPEC_CD.all*0.8){tutStage(m,5);const l=specials(s);s.sel=Math.max(0,l.indexOf('harp'));toast('Good. Now the harpoon (right mouse).','good');}
+    else if(m.stage===5&&s&&s.scd.harp>SPEC_CD.harp*0.7){tutStage(m,6);tutRaiderMake();toast('A practice raider comes up. Sink her.','good');}
+    else if(m.stage===6){
+      if(!tutRaider||tutRaider.dead){
+        const sh=tutOwnShip();if(sh&&T.mods0){sh.mods=Object.assign({bow:0,all:0,harp:0,vol:0},JSON.parse(T.mods0));sh.sel=0;}T.mods0=null;
+        say([{who:PEL,txt:'Clean work. She sank like a stone.'},{who:PEL,txt:'I will take my training guns off your Cutter. She is back to stock, and the Crown pays me for the lesson, so here is a little for you.'}],()=>completeStory(14,100,15));
+        m.stage=9;
+      }
+    }
+  }};
+function tutArm(){
+  const sh=tutOwnShip();if(!sh)return;
+  if(!G.tut.mods0)G.tut.mods0=JSON.stringify(sh.mods||{bow:0,all:0,harp:0,vol:0});
+  sh.mods=Object.assign({},sh.mods,{bow:1,all:1,harp:1});
+}
+function tutBuoyMake(){const c=randDeepNear(TDOCK.x,TDOCK.y+600,500,120)||randDeep();tutBuoy=c;}
+function tutRaiderMake(){
+  const P=player,c=randDeepNear(P.x,P.y,700,120)||randDeep();
+  tutRaider=mkShip('sloop','raider',c.x,c.y,rr(0,TAU),'ai');tutRaider.hp=tutRaider.maxhp=70;tutRaider.noLoot=true;
+}
+STORY[15]={title:'Word on the Docks',brief:'A dockhand has news.',story:true,tut:true,
+  start(m){G.tut.s=5;m.stage=0;storySyncNpc();},
+  obj(m){return 'Talk to the dockhand by the tavern';},
+  target(m){return G.npc?{x:G.npc.x,y:G.npc.y}:null;}};
+STORY[16]={title:'The King\'s Letter',brief:'The King has an announcement for any captain brave enough.',story:true,tut:true,
+  start(m){G.tut.s=6;m.stage=0;},
+  obj(m){return 'Enter Crown Rock castle and speak to the King';},
+  target(m){const z=throneZone();return z?{x:z.x,y:z.y}:null;},
+  onThrone(m){
+    say([
+      {who:KING_NAME,txt:'Captain. Word of your work has reached my court. A pirate who sinks ships and asks few questions is exactly what the Crown needs.'},
+      {who:KING_NAME,txt:'The Navy cannot be seen to hunt the pirate lords bleeding my trade. A privateer can. Take this letter of marque.'},
+      {who:KING_NAME,txt:'Sink the ones I name. Take the captains I ask for alive. The Crown will pay well. While a contract runs, my Navy will leave you be. The pirate towns will not. Remember that.'},
+      {who:KING_NAME,txt:'The contract board is on your own ship, at the captain\'s desk. Do not make me regret this.'}
+    ],()=>{G.tut={s:99,st:0};completeStory(16,300,0);later(2.5,()=>banner('LETTER OF MARQUE','Contracts are open at your captain\'s desk'));});
+  }};
+function tutTalk(){
+  const T=G.tut,m=mission;if(!T||T.s>=99)return;
+  const s=T.s;
+  if(s===1){say([{who:SIL,txt:'Get yourself into the Rusty Anchor, friend. A meal and a bunk will fix you up.'}]);return;}
+  if(s===2&&m&&m.def.tut){
+    const st=m.stage;
+    if(st===1){say([
+      {who:BRA,txt:'Another washed up recruit. Fine. Silas sent you, so I will not shout. Much.'},
+      {who:BRA,txt:'Here is a practice cutlass and a pouch of throwing knives. Loaned, not given. I want them back.'},
+      {who:BRA,txt:'Hold Tab to open the weapon wheel. Put your blade in one hand and the throwing knives in the other. Your first hand attacks with {L}, your second with {R}.'},
+      {who:BRA,txt:'Throw a knife, swing the blade, then open the wheel and pick From stash while you stand by your steed. Come back to me when you are done.'}
+    ],()=>{G.owned.knives=1;G.ammo.knives=10;G.owned.cutlass=1;toast('Practice gear loaned: Throwing Knives and a cutlass. Open the weapon wheel (hold Tab).','good');tutStage(m,2);});return;}
+    if(st===6){
+      say([
+        {who:BRA,txt:'Not completely hopeless. Hand me the practice gear.'},
+        {who:BRA,txt:'You keep this cutlass. It is yours. And here is a little for your trouble.'}
+      ],()=>{
+        const pre=T.pre||{owned:{},ammo:{}};
+        G.owned=Object.assign({},pre.owned);G.carry=[];G.melee='fists';G.gun='nogun';G.ammo=Object.assign({},G.ammo,pre.ammo);
+        G.gold=Math.max(G.gold,T.gold0|0);syncCarry();acquireWeapon('cutlass');
+        T.pre=null;completeStory(12,60,13);
+      });return;}
+    say([{who:BRA,txt:st<2?'Buy yourself a blade first.':'Keep at it. Wheel, throw, swing, stash.'}]);return;
+  }
+  if(s===3&&m&&m.stage===2){
+    say([
+      {who:MER,txt:'Well, well. She flies a fine flag now. Fine work.'},
+      {who:MER,txt:'I will take both hulls off your hands. My sloop goes back to her slip, the prize I sell on. That is a hundred and fifty gold for you.'},
+      {who:MER,txt:'And as promised, the clerk has filed papers on a little Cutter. She is yours. The smallest hull in the harbour, but she is yours, free and legal enough.'}
+    ],()=>{
+      if(player.ship&&!player.ship.own)tutRemoveShip(player.ship);
+      tutRemoveShip(tutStolen);tutRemoveShip(tutLoan);tutStolen=tutLoan=null;
+      const sh=spawnDockShip('cutter',TPIER);registerShip(sh,true);
+      toast('The Cutter is yours. Papers filed.','good');
+      completeStory(13,150,14);
+    });return;
+  }
+  if(s===4&&m&&m.stage===0){
+    say([
+      {who:PEL,txt:'New captain, eh? Then you need drilling. I have bolted training guns onto your Cutter: bow chasers, a 360 swivel and a harpoon.'},
+      {who:PEL,txt:'Board her, steer out to the buoy, fire the guns, then sink a practice raider. When you are done I take my guns back and she returns to stock.'}
+    ],()=>{tutArm();tutStage(m,1);toast('Training guns fitted to your Cutter. Board her.','good');});return;
+  }
+  if(s===5){
+    say(ONLINE?[
+      {who:'Dockhand',txt:'Did you hear? The King has an announcement for any captain brave enough. The heralds posted it at Crown Rock.'},
+      {who:'Dockhand',txt:'They say he is looking for a captain he can trust with a task. Go and see him.'}
+    ]:[
+      {who:'Dockhand',txt:'You are the new captain? Good. Captain Flint at the Rusty Anchor is hiring. He pays well for work no honest sailor would take.'},
+      {who:'Dockhand',txt:'And mind the King\'s ships. There is talk at the court that the Crown has its eye on this bay.'}
+    ],()=>{
+      if(ONLINE){completeStory(15,0,16);}
+      else{G.tut={s:99,st:0};completeStory(15,0,0);toast('Visit Captain Flint at the Rusty Anchor for work.','good');}
+    });return;
+  }
+}
+function tutPoll(dt){
+  const T=G.tut;if(!T||T.s>=99||G.state!=='play'||G.dlg||G.shop||player.dead||G.paused)return;
+  const m=mission;if(!m||!m.def.tut||!m.def.poll)return;
+  m.def.poll(m,dt);
+}
+function tutNewGame(){
+  const P=player;
+  G.tut={s:1,st:0};
+  G.owned={};G.carry=[];G.melee='fists';G.gun='nogun';
+  G.ammo={shot:0,grape:0,bombs:0,knives:0,rums:0,molos:0,hatchets:0};
+  G.gold=60;P.hp=Math.round(P.maxhp*0.28);
+  if(G.steed){dropSteedFromWorld(G.steed);}G.steed=null;G.stable=[];
+  syncCarry();mission=null;
+  later(0.3,()=>{if(!mission&&G.tut.s===1)startStoryMission(11);});
+}
 /* ---- zones that belong to the story ---- */
 function zoneUse(z){
   if(z.kind==='tavern'||z.kind==='stable'||z.kind==='armory'||z.kind==='governor')return enterInterior(z);
   if((z.kind==='shipyard'||z.kind==='registry')&&!player.ship)return enterInterior(z);
   if(z.kind==='throne'){
-    if(mission&&mission.def.onThrone)return mission.def.onThrone(mission);
-    if(G.story.s>=5)return say([{who:KING_NAME,txt:'You are not welcome in my hall, murderer.'}]);
+    if(G.story.s>=5&&G.story.s<8&&!(mission&&mission.idx===107))return say([{who:'Castle guard',txt:'You are not welcome in the King\'s hall, murderer. Move along.'}]);
     return enterInterior(z);
   }
   if(z.kind==='cave'){
     if(G.story.s===3&&!G.story.haleDead&&mission&&mission.idx===103)return haleTalk();
+    if(mission&&mission.idx===107){if(mission.stage>=3)return say([{who:'',txt:'You already carry Lt. Hale. Take him to the King.'}]);return startRetrieval();}
     return say([{who:'',txt:G.story.s>=4?'The great door has sealed itself. Whatever slept below is gone.':'A door of black stone, sealed with a royal mark. Cold air seeps through the cracks. It will not open for you yet.'}]);
   }
   openShop(z);
@@ -5382,6 +5933,11 @@ function exitDungeon(win){
 function finishExit(){
   const D=G.deck,ex=D.exiting;G.deck=null;parts.length=0;mouse.down=false;mouse.rdown=false;
   const P=player;P.x=GRAVE.plaza.x;P.y=GRAVE.plaza.y;P.invuln=1.5;cam.x=P.x;cam.y=P.y;
+  if(D.retrieve){
+    if(D.hasBody){G.story.body=true;if(mission&&mission.idx===107)mission.stage=3;toast('You carry Lt. Hale out of the dark. Take him into the castle to the King.','good');patrolHunt();}
+    else{if(mission&&mission.idx===107)mission.stage=0;toast('You climb out without him. The door will open again.');}
+    return;
+  }
   if(ex.win){
     G.story.s=4;G.story.haleDead=true;
     completeStory(3,900,4);
@@ -5417,7 +5973,16 @@ function storySceneTick(D,dt){
     }
     return;
   }
+  autoStairs(D);
   const L=D.L;
+  if(D.retrieve){
+    const brood=D.ambush&&D.ambush.some(e=>!e.dead);
+    if(brood){D.objText='Survive the Gravemaw\'s brood';D.guide=null;}
+    else if(D.hasBody){D.objText='Carry Lt. Hale back up to the surface'+(D.lv===1?'  (the lair)':'  (the upper crypt)');D.guide=L.up;}
+    else if(D.lv===0){D.objText='Find the stairs down to the Gravemaw lair';D.guide=L.down;}
+    else{D.objText='Recover Lt. Hale\'s body from the lair';D.guide=L.body;}
+    return;
+  }
   if(D.lv===0){D.objText='Find the stairs down  (Level 1 of 3)';D.guide=L.down;}
   else if(D.lv===1){
     const gateShut=L.gate&&D.grid[L.gate.ty*D.W+L.gate.tx]===SC.GATE;
@@ -5431,8 +5996,24 @@ function storySceneTick(D,dt){
   }
   if(D.ally&&D.ally.dead&&!D.noHaleToast){D.noHaleToast=true;}
 }
+function autoStairs(D){
+  if(D.trans||D.exiting||G.dlg)return;
+  const L=D.L,p=D.p;if(!D.stairArm)D.stairArm={up:false,down:false};
+  for(const k of ['up','down']){
+    const t=L[k];if(!t)continue;
+    const d=Math.hypot(t.x-p.x,t.y-p.y);
+    if(d>70)D.stairArm[k]=true;
+    if(D.stairArm[k]&&d<32){
+      D.stairArm[k]=false;
+      if(k==='up'){if(t.exit)exitDungeon(false);else sceneSwitchLevel(D,D.lv-1,'up');}
+      else sceneSwitchLevel(D,D.lv+1,'down');
+      return;
+    }
+  }
+}
 function storyLevelEnter(D){
-  const L=D.L;banner(L.name.toUpperCase(),'Level '+(D.lv+1)+' of 3');
+  const L=D.L;
+  if(D.retrieve){banner(D.lv===0?'THE UPPER CRYPT':'THE GRAVEMAW LAIR',D.lv===0?'Cult shrines and restless dead':'Where the beast fell');if(D.lv===1&&!D.lairSay){D.lairSay=1;later2(D,1.4,()=>say([{who:'',txt:'The arena is ruined. Where the Gravemaw fell, the stone is scorched black, and the bones of a hundred patrols lie heaped against the walls.'},{who:'',txt:'At the centre of it all, a shape in a torn blue Navy coat.'}]));}return;}banner(L.name.toUpperCase(),'Level '+(D.lv+1)+' of 3');
   if(D.lv===2)later2(D,1.5,()=>{if(D.ally&&!D.ally.dead)allyBark(D,'That is no ordinary dark. Careful.');});
 }
 /* ================= rum, the drunk state and the inventory ================= */
@@ -5493,6 +6074,7 @@ function buildInv(){
   };
   row('Ship papers',G.items.papers|0,'One set claims one ship. Sign at the captain\'s desk, below deck on the ship.');
   row('Horse tonic',G.items.tonic|0,'Heals or revives your steed (stand beside it or ride it).','Use',()=>useTonic(),(G.items.tonic|0)>0&&!G.deck);
+  row('Lumber',G.items.lumber|0,'For crew repairs aboard ship. Chop trees with a weapon swing (axes are fastest), salvage wreckage, open chests.');
   row('Bottle of rum',G.items.rum|0,'Mild healing. Too many and you get drunk: health drops to half and your controls turn about.','Drink',()=>drinkRum(false),(G.items.rum|0)>0);
   if(isDrunk())mk('p','You are drunk for another '+Math.ceil(G.drunk.t)+'s. Sleeping cures it.','font-size:13px;margin:6px 0;color:#6a2a8a');
   const cl=mk('button','Close','display:block;width:100%;margin-top:12px');cl.className='btn';cl.addEventListener('click',()=>{cl.blur();closeStash();});
@@ -5544,6 +6126,7 @@ function genInterior(kind,o){
   const f=st.food;
   if(f)L.spots.push({k:'food',x:2.5*TS+16,y:7*TS+16,r:60,label:'Eat: '+f[0]+' - '+f[1]+' gold (heals '+f[2]+')',tag:'Meal',run:D=>intEat(D,f)});
   if(kind==='tavern'){set(W-4,7,SC.TABLE);set(W-3,7,SC.TABLE);set(6,9,SC.TABLE);set(8,9,SC.TABLE);}
+  if(kind==='shipyard'&&G.tut&&G.tut.s===3&&(G.tut.st|0)===0){L.npcs.push({x:px(3),y:(H-4)*TS+16,a:0,coat:'#3a3a46',coat2:'#c0a060',skin:'#d9a878',hat:'tricorn',name:'Stranger'});L.spots.push({k:'stranger',x:px(3),y:(H-4)*TS+16,r:70,label:'Talk to the stranger',tag:'Stranger',run:D=>tutStranger(D)});}
   if(kind==='shipyard'){set(1,2,SC.BARREL);set(W-2,2,SC.BARREL);set(1,H-3,SC.BARREL);set(W-2,H-3,SC.BARREL);set(W-4,6,SC.TABLE);set(W-5,6,SC.TABLE);}
   if(kind==='armory'){set(1,5,SC.CHEST);set(1,7,SC.CHEST);set(W-2,5,SC.CHEST);set(W-2,7,SC.CHEST);}
   if(kind==='stable'){set(1,9,SC.RUBBLE);set(2,9,SC.RUBBLE);set(W-2,9,SC.RUBBLE);set(W-3,9,SC.RUBBLE);}
@@ -5578,14 +6161,8 @@ function genShipInterior(sh){
   L.spots.push({k:'ward',x:px(Wc+2),y:px(1)+10,r:58,label:'Change clothes',tag:'Wardrobe',run:D=>openWard()});
   set(Wc+3,H-3,SC.DESK);set(Wc+4,H-3,SC.DESK);
   L.spots.push({k:'desk',x:(Wc+4)*TS,y:(H-3)*TS+16,r:66,tag:'Captain\'s desk',
-    label:D=>{
-      if(sh.own)return 'Captain\'s desk: the ship\'s log (nothing to sign yet)';
-      if(sh.fac!=='pirate')return 'Captain\'s desk';
-      if(fleetCount()>=3)return 'Captain\'s desk: your fleet is full (3/3). Sell a ship first.';
-      if((G.items.papers|0)<=0)return 'Captain\'s desk: you hold no ship papers. Buy a set at a Harbour Registry.';
-      return 'Claim the '+(ST[sh.type]||{}).name+' with a set of ship papers ('+G.items.papers+' held)';
-    },
-    run:D=>claimShip(D,sh)});
+    label:D=>sh.own?'Captain\'s desk: papers, repairs and contracts':sh.fac!=='pirate'?'Captain\'s desk':'Captain\'s desk: file ship papers to claim her',
+    run:D=>{if(!sh.own&&sh.fac!=='pirate'){toast('Not your ship to claim.');return;}openShop({kind:'desk',name:'Captain\'s desk',law:false,sh,D});}});
   return L;
 }
 function claimShip(D,sh){
@@ -5596,6 +6173,8 @@ function claimShip(D,sh){
   D.sceneName=sh.name+' - below deck';
 }
 function zoneUseThrone(z){
+  if(mission&&mission.def.onThrone)return mission.def.onThrone(mission);
+  if(G.story.s>=8)return say([{who:KING_NAME,txt:'Captain. The Crown has work for a privateer. Find it at the desk of your own ship.'}]);
   const q=G.story.s===0?'The Crown has no business with you today, pirate. Come back when you have made yourself useful.':'The King is busy. Return when you have news of Gravemaw.';
   say([{who:KING_NAME,txt:q}]);
 }
@@ -5624,6 +6203,7 @@ function finishInterior(){
   const D=G.deck;G.deck=null;parts.length=0;mouse.down=false;mouse.rdown=false;closeStash();
   const P=player;P.invuln=Math.max(P.invuln,0.6);cam.x=P.x;cam.y=P.y;
 }
+function mendCost(sh){const m=Math.max(0,sh.maxhp-sh.hp);return {gold:Math.ceil(m*0.5),wood:Math.ceil(m/25)};}
 function intSleep(D){if(D.sleep||D.exiting)return;D.sleep={t:0,done:false};sfx('ui');}
 function intEat(D,f){
   const P=player;
@@ -5631,6 +6211,7 @@ function intEat(D,f){
   if(G.gold<f[1]){toast('Not enough gold for a meal.','bad');sfx('no');return;}
   G.gold-=f[1];P.hp=Math.min(P.maxhp,P.hp+f[2]);sfx('coin');
   toast(f[0]+'. +'+f[2]+' health.','good');
+  if(mission&&mission.def.onEat)mission.def.onEat(mission);
 }
 function intInteract(D,consider){
   if(D.sleep||D.exiting||G.stashOpen)return;
@@ -5641,7 +6222,15 @@ function intInteract(D,consider){
     consider({d:s.k==='exit'?d+30:d,id:s.k,label:typeof s.label==='function'?s.label(D):s.label,run(){if(s.k==='exit'){D.exiting={t:0,kind:'int'};sfx('ui');}else s.run(D);}});
   }
 }
+function autoExit(D){
+  if(D.exiting||D.sleep||G.dlg||G.stashOpen||G.shop)return;
+  const ex=D.L.spots.find(x=>x.k==='exit');if(!ex)return;
+  const d=Math.hypot(ex.x-D.p.x,ex.y-D.p.y);
+  if(d>60)D.exitArm=true;
+  if(D.exitArm&&d<30){D.exitArm=false;D.exiting={t:0,kind:'int'};sfx('ui');}
+}
 function intTick(D,dt){
+  autoExit(D);
   const s=D.sleep;
   if(s){
     s.t+=dt;D.fadeOut=s.t<0.9?s.t/0.9:s.t<1.5?1:Math.max(0,1-(s.t-1.5)/0.6);
@@ -5649,7 +6238,14 @@ function intTick(D,dt){
       s.done=true;const P=player;if(!isDrunk())P.hp=P.maxhp;G.tod=0.3;
       if(G.steed&&G.steed.hp!==undefined&&G.steed.maxhp)G.steed.hp=G.steed.maxhp;
       const was=isDrunk();if(was){G.drunk.t=0;G.drunk.buzz=0;hideDrunk();}
+      let mendMsg='';
+      if(D.ship&&D.ship.mendOn&&D.ship.hp<D.ship.maxhp){
+        const c=mendCost(D.ship);
+        if(G.gold>=c.gold&&(G.items.lumber|0)>=c.wood){G.gold-=c.gold;G.items.lumber-=c.wood;D.ship.hp=D.ship.maxhp;mendMsg=' The crew mended the hull (-'+c.gold+' gold, -'+c.wood+' lumber).';}
+        else mendMsg=' The crew could not mend the hull: it needs '+c.gold+' gold and '+c.wood+' lumber.';
+      }
       const ok=writeSave(true);
+      if(mendMsg)later(1.2,()=>toast(mendMsg.trim(),D.ship&&D.ship.hp>=D.ship.maxhp?'good':'bad'));
       toast(was?'You sleep it off. Sober again, but not rested'+(ok?'. Game saved.':'.'):'You wake rested. Health restored'+(ok?'. Game saved.':'.'),'good');
     }
     if(s.t>=2.2){D.sleep=null;D.fadeOut=0;}
@@ -5722,7 +6318,7 @@ function drawNpc(){
   const n=G.npc;if(!n)return;
   const pu=0.5+0.5*Math.sin(G.t*3);
   ctx.fillStyle='rgba(120,190,255,'+(0.12+0.1*pu)+')';ctx.beginPath();ctx.arc(n.x,n.y,22+3*pu,0,TAU);ctx.fill();
-  drawFolk({x:n.x,y:n.y,a:n.a,coat:'#2f4a78',coat2:'#e8e2d0',skin:'#e0b48a',hat:'tricorn',walk:0,swing:0,weapon:'rapier',flash:0});
+  drawFolk({x:n.x,y:n.y,a:n.a,coat:n.coat||'#2f4a78',coat2:n.coat2||'#e8e2d0',skin:n.skin||'#e0b48a',hat:n.hat||'tricorn',walk:0,swing:0,weapon:'rapier',flash:0});
   if(TILT())upr(n.x,n.y,()=>{ctx.font='700 11px Georgia';ctx.textAlign='center';ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(n.name,1,-40);ctx.fillStyle='#bfe0ff';ctx.fillText(n.name,0,-41);});else{ctx.font='700 11px Georgia';ctx.textAlign='center';ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(n.name,n.x+1,n.y-17);ctx.fillStyle='#bfe0ff';ctx.fillText(n.name,n.x,n.y-18);}
 }
 /* ================= TILT VIEW (beta): oblique 3/4 projection, switchable from the pause menu ================= */
@@ -6262,7 +6858,7 @@ function crewCall(f){
 /* ---- cloud saves (Supabase: email sign-in + one save row per slot) ---- */
 (function(){
   const URL0='https://lhdkuubbopvgjeyqzlei.supabase.co',KEY='sb_publishable_m8oPOkzAXMem-F2MzR2Pbg_F6PcsSMh';
-  const SKEY='blackwaterbay.cloud.session',SLOT=SAVE_KEY.indexOf('tester')>=0?'tester':'main';
+  const SKEY='blackwaterbay.cloud.session',SLOT=(SAVE_KEY.indexOf('tester')>=0?'tester':'main')+(ONLINE?'-online':'');
   let sess=null,status='',busy=false,upT=0,lastUp=0,cloudMeta=null;
   try{sess=JSON.parse(localStorage.getItem(SKEY)||'null');}catch(e){}
   const keep=()=>{try{if(sess)localStorage.setItem(SKEY,JSON.stringify(sess));else localStorage.removeItem(SKEY);}catch(e){}};
@@ -6517,7 +7113,14 @@ function drawKnife(k){
     return items;
   }
   function levelItems(to){
-    return to==='weap'?weapSubItems():to==='items'?itemSubItems():to==='put'?putItems(WHEEL.putH):cmdItems();
+    return to==='off'?offItems(WHEEL.putH):to==='weap'?weapSubItems():to==='items'?itemSubItems():to==='put'?putItems(WHEEL.putH):cmdItems();
+  }
+  // after a throwing weapon goes in one hand, offer a melee weapon for the other hand
+  function offItems(h){
+    const items=WORDER.filter(k=>isCarryCat(k)&&G.owned[k]&&!G.carry.includes(k)&&WEAP[k].cat==='melee'&&!WEAP[k].hidden).map(k=>({kind:'putw',h,k,label:WEAP[k].n,sub:'melee, '+(h?'right':'left')+' hand'}));
+    const cur=G.carry[h];
+    items.push({kind:'run',label:cur?'Keep '+WEAP[cur].n:'Leave empty',sub:'no change',run(){}});
+    return items;
   }
   function putItems(h){
     const items=WORDER.filter(k=>isCarryCat(k)&&G.owned[k]&&!G.carry.includes(k)).map(k=>{const w=WEAP[k];return {kind:'putw',h,k,label:w.n,sub:w.cat==='melee'?'melee':'x'+(G.ammo[w.ammo]|0)};});
@@ -6570,7 +7173,7 @@ function drawKnife(k){
     const lvl=WHEEL.level,LT={weap:'Weapons',items:'Items',cmd:'Crew & steed',put:'Swap in'},cmd=lvl!=='main',thr=false;
     const h1=make('text',{x:g.cx,y:g.cy-4,'text-anchor':'middle','font-family':"'Pirata One',Lora,serif",'font-size':Math.max(15,g.S*0.034),fill:'#f4c542'},WHEEL.svg);h1.textContent=it?it.label:(cmd?LT[lvl]:(P0().ship?'Ship':'Wheel'));h1.style.pointerEvents='none';
     const h2=make('text',{x:g.cx,y:g.cy+g.S*0.03,'text-anchor':'middle','font-family':"Lora,Georgia,serif",'font-size':Math.max(10,g.S*0.021),fill:'#c9b685'},WHEEL.svg);
-    h2.textContent=it?(it.disabled?(it.why||'unavailable'):(WHEEL.sticky?'click or Enter':'release to use')):(WHEEL.sticky?((cmd||thr)?'centre: back':'centre: close'):'aim at a slice');h2.style.pointerEvents='none';
+    h2.textContent=it?(it.disabled?(it.why||'unavailable'):(WHEEL.sticky?'click or Enter':(WHEEL.src==='pad'?'press '+padKey('E')+' to use':'release to use'))):(WHEEL.sticky?((cmd||thr)?'centre: back':'centre: close'):'aim at a slice');h2.style.pointerEvents='none';
   }
   function ensure(){
     const stage=document.getElementById('pause').parentNode;
@@ -6602,7 +7205,14 @@ function drawKnife(k){
     if(!it){if(!WHEEL.sticky)close();return;}
     if(it.disabled){sfx('no');if(it.why)toast(it.why.charAt(0).toUpperCase()+it.why.slice(1),'bad');if(!WHEEL.sticky)close();return;}
     if(it.kind==='slot'){const st=stashState();if(!st.ok){sfx('no');toast(WEAP[G.carry[it.h]]?WEAP[G.carry[it.h]].n+' in your '+(it.h?'right':'left')+' hand. '+st.why.charAt(0).toUpperCase()+st.why.slice(1):st.why,'bad');if(!WHEEL.sticky)close();return;}WHEEL.level='put';WHEEL.putH=it.h;WHEEL.items=putItems(it.h);WHEEL.sticky=true;WHEEL.sel=-1;render();sfx('ui');return;}
-    if(it.kind==='putw'){const c=[G.carry[0]||null,G.carry[1]||null];c[it.h]=it.k;G.carry=c.filter(Boolean);syncCarry();toast(WEAP[it.k].n+' in your '+(it.h?'right':'left')+' hand.','good');sfx('ui');close();return;}
+    if(it.kind==='putw'){
+      const c=[G.carry[0]||null,G.carry[1]||null];c[it.h]=it.k;G.carry=c.filter(Boolean);syncCarry();toast(WEAP[it.k].n+' in your '+(it.h?'right':'left')+' hand.','good');sfx('ui');
+      if(WEAP[it.k].thr==='blade'){
+        const o=1-it.h,ow=G.carry[o],opts=offItems(o);
+        if((!ow||WEAP[ow].cat!=='melee')&&opts.length>1){WHEEL.level='off';WHEEL.putH=o;WHEEL.items=opts;WHEEL.sticky=true;WHEEL.sel=-1;render();toast('Pick a melee weapon for your '+(o?'right':'left')+' hand, or keep what you hold.');return;}
+      }
+      close();return;
+    }
     if(it.kind==='sub'){WHEEL.level=it.to||'cmd';WHEEL.items=levelItems(WHEEL.level);WHEEL.sticky=true;WHEEL.sel=-1;render();sfx('ui');return;}
     if(it.kind==='spec'){if(player.ship)player.ship.sel=it.idx;}
     else if(it.kind==='weap'){const w=WEAP[it.k];if(w.cat==='melee')G.melee=it.k;else G.gun=it.k;}
@@ -6644,10 +7254,14 @@ function drawKnife(k){
     const rm=Math.hypot(rx,ry),lm=Math.hypot(lx,ly);
     const sx=rm>0.4?rx:(lm>0.4?lx:0),sy=rm>0.4?ry:(lm>0.4?ly:0);
     if(sx||sy)setSel(pick(sx,sy,0.01));
-    if(WHEEL.sticky){
+    if(WHEEL.src==='pad'){
+      if(!b(4)){close();return true;}
+      if(press(0))finish();
+      else if(press(1)){if(WHEEL.level!=='main')back();else close();}
+    }else if(WHEEL.sticky){
       if(press(0))finish();
       else if(press(1)||press(4)){if(WHEEL.level!=='main')back();else close();}
-    }else if(WHEEL.src==='pad'&&!b(4))finish();
+    }
     return true;
   };
   // old swap controls are gone: tidy the help text
@@ -6657,7 +7271,7 @@ function drawKnife(k){
       for(const d of [...ctrl.children]){if(/^Swap weapons/.test(d.textContent)){const nx=d.nextElementSibling;d.remove();if(nx)nx.remove();break;}}
       const a=document.createElement('div');a.textContent='Weapon wheel and commands';const b=document.createElement('div');b.innerHTML='Hold <span class="kbd">Tab</span> or middle mouse, move to a slice, release. <b>Commands</b> holds crew, steed and tonic.';ctrl.appendChild(a);ctrl.appendChild(b);
     }
-    const ph=document.getElementById('padHelp');if(ph)ph.innerHTML=ph.innerHTML.replace('LB / L1 switch ranged or special','LB / L1 hold opens the weapon wheel (aim with a stick, release to use; pick Commands for crew, steed and tonic)').replace(' &middot; RB / R1 switch melee','');
+    const ph=document.getElementById('padHelp');if(ph)ph.innerHTML=ph.innerHTML.replace('LB / L1 switch ranged or special','LB / L1 hold opens the weapon wheel (aim with a stick, press A / Cross to use, B / Circle to go back, release LB to close; pick Commands for crew, steed and tonic)').replace(' &middot; RB / R1 switch melee','');
     const m=document.querySelector('.tb[data-b="5"]');if(m)m.textContent='SWAP';
     const sw=document.querySelector('.tb[data-b="4"]');if(sw)sw.textContent='WHEEL';
     const cb=document.getElementById('crewBtn');if(cb)cb.remove();
@@ -6667,7 +7281,7 @@ function drawKnife(k){
 /* ---- version tag ---- */
 (function(){
   try{
-    const lab=(SAVE_KEY.indexOf('tester')>=0?'Tester v'+BB_V.tester:'Version v'+BB_V.main)+' \u00b7 '+BB_DATE;
+    const lab=(SAVE_KEY.indexOf('tester')>=0?'Tester v'+BB_V.tester:'Version v'+BB_V.main)+' \u00b7 '+BB_DATE+(ONLINE?' \u00b7 ONLINE PREVIEW':'');
     window.BB_LABEL=lab;
     const tt=document.getElementById('title');
     if(tt){const d=document.createElement('div');d.id='verTag';d.textContent=lab;d.style.cssText='position:absolute;left:14px;bottom:10px;font:600 13px Lora,Georgia,serif;color:#c9b685;opacity:.8;pointer-events:none;z-index:3';tt.appendChild(d);}
@@ -6691,7 +7305,7 @@ function frame(ts){
   }else if(G.state==='play'&&!G.paused&&!G.shop&&!G.dbg&&!G.stashOpen){
     drunkTick(dt);
     if(G.dlg){dlgTick(dt);if(!G.deck)updateParts(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);
-    storyArrestTick(dt);
+    storyArrestTick(dt);doorWalk();tutPoll(dt);
   }else if(G.state==='play'&&G.shop){updateParts(dt);}
   render();
   if(G.state==='play'){
@@ -6716,7 +7330,7 @@ function boot(){
   $('startBtn').disabled=false;
   G.ready=true;
   {const ps=$('pressStart');if(ps){ps.textContent='Press Start';ps.classList.remove('wait');}}
-  window.__bb={townAnger,startFight,FIGHT_TOWNS,CORRALS,critters,cleanSweep,sweepIdleShips,sweepPeople,ships,people,mkShip,decor,MW,WHEEL,WW,WH,PIERS,callSpot,summonTo,crewCall,islandPier,drinkRum,drunkTick,isDrunk,claimShip,openInv,fleetCount,registerShip,enterInterior,enterShipInterior,openWard,intSleep,intEat,genInterior,acquireWeapon,swapHands,handWeapon,handUse,syncCarry,openStash,closeStash,stashState,fires,bombs,thrownOwned,STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,WHEEL,knifeDrops,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
+  window.__bb={padMenu,pad,openStash,buildStash,WHEEL,balls,ctl,tutBuoyGet:()=>tutBuoy,tutRaiderGet:()=>tutRaider,tameHorse,enterInterior,boardShip,leaveShip,completeHijack,mkShip,tutTalk,tutStranger,tutNpc,tutHorse,tutOwnShip,skipTut:()=>{mission=null;G.tut={s:99,st:0};storySyncNpc();},ships,horses,START,TPIER,TDOCK,zones,dlgAdvance,zoneUse,caveZone,throneZone,sceneInteract,startStoryMission,buildStash,debugWeapons,WHEELitems:()=>WHEEL.items,getMission:()=>mission,contractOffers,startContract,contractDef,inContract,privateerOpen,pickups,pickInteract,damageShip,addLumber,hitTree,treeInSwing,treeHP,WEAP,ONLINE,NET,setOnline,townAnger,startFight,FIGHT_TOWNS,CORRALS,critters,cleanSweep,sweepIdleShips,sweepPeople,ships,people,mkShip,decor,MW,WHEEL,WW,WH,PIERS,callSpot,summonTo,crewCall,islandPier,drinkRum,drunkTick,isDrunk,claimShip,openInv,fleetCount,registerShip,enterInterior,enterShipInterior,openWard,intSleep,intEat,genInterior,acquireWeapon,swapHands,handWeapon,handUse,syncCarry,openStash,closeStash,stashState,fires,bombs,thrownOwned,STORY,startStoryMission,storyTick,startDungeon,startPrison,exitDungeon,haleTalk,zoneUse,say,dlgKey,dlgTick,storyArrestTick,storySyncNpc,sceneUse,sceneInteract,updateScene,prisonCaught,guardUpdate,SC,gridHit,sceneLoadLevel,finishPrisonEscape,storyArrest,CASTLE:()=>CASTLE,GRAVE:()=>GRAVE,SENT:()=>SENT,getMission:()=>mission,setMission:m=>{mission=m;},music,musicUpdate,musicWant,MUSIC_SRC,vpad,tch,touchSync,touchOff,cam,render,missionTarget,startMission,padMenu,padPoll,pad,setPads:f=>{padSrc=f;},padRange,mouseWorld,sideAimOff,bowAim,ST,damageShip,fireBow,debugTick,toggleDebug,openDebug,closeDebug,debugRun,DBG_PAGES,debugTeleport,debugSteed,debugRun,dbgItems,openDebug,debugShip,toggleMap,fireSpecial,registerShip,specials,curSpecial,startDeck,endDeck,makeDeck,fleetCount,summonShip,VOL,applyMaster,WHEEL,knifeDrops,crewCall,nearestPier,tileAt,TL,openShop,buy,shopItems,MODINFO,SHIP_PRICE,PIERS,harps,balls,deckFree,hurtE,completeHijack,startHijack,pickInteract,onKey,mkShip,sinkShip,applySave,dockSpot,G,player,ships,people,horses,whistle,hurt:hurtPlayer,keys,mouse,zones,tiles,TOWNS,startGame,writeSave,readSave,step:(dt)=>{if(G.state==='play'){if(G.dlg){dlgTick(dt);}else if(G.deck)updateDeck(dt);else updateAll(dt);storyArrestTick(dt);}render();if(G.state==='play'){updateHUD();drawMinimap();}}};
   requestAnimationFrame(frame);
 }
 setTimeout(boot,40);
