@@ -2,6 +2,14 @@
 
 Generated from the in-game change log (Options > Change log).
 
+## Version 75 (Oct 15, 2026)
+
+- Real fix for the controller stash glitch: the menu selection was being reset every frame while the stash was open, so it moved for one frame and snapped back. It now stays where you move it. Also: the weapon stash no longer jumps the controller highlight back to the first Stash it button after every action (a second A press stashed your weapon again). The highlight now stays where you were, or moves to the section header, and never starts on a Stash it button.
+
+## Version 74 (Oct 15, 2026)
+
+- Aim lock-on: hold right mouse (keyboard) or left trigger (controller) to snap your aim to the nearest target on foot, in boarding and dungeon fights and at sea. A red ring shows the target. To free those buttons the right-hand attack, swivel and harpoon moved to Space and B.
+
 ## Version 73 (Oct 15, 2026)
 
 - The controls help screen no longer lists Rum, ship papers. E and A no longer get you off a ship either, and the V key for the horse tonic is gone (use the weapon wheel or inventory). E and A no longer board or hijack ships (F / Y only), and Y no longer uses the horse tonic. Dig, talk and enter stay on E / A.
