@@ -2,6 +2,33 @@
 
 Generated from the in-game change log (Options > Change log).
 
+## Version 80 (Nov 8, 2026)
+
+- Boarding camera zoomed in: the fixed deck zoom went from 0.5 to 3.2, so the fight is up close. It stays fixed (the mouse wheel does not change it).
+
+## Version 79 (Nov 8, 2026)
+
+- Painted interiors: every shop, the Governor's hall, the throne room, the crypt, the bone galleries and the castle prison now use painted floors and walls, with painted beds, tables, desks, barrels, wardrobes, pillars, rugs, chests, stairs, gates, cell bars, doors, rubble, portals and wall torches.
+- Boarding: enemy decks now have painted planks, deck cannons along the rails, masts, crates, barrels, the lockbox and the captain's cabin with its desk and rug. The hull rim keeps the ship's faction colour.
+- Top view only; the tilted view keeps the old look.
+
+## Version 78 (Nov 8, 2026)
+
+- Walking now shows steps: feet stride out from under the painted characters and the body sways a little with each step. Feet tuck back in when you stand still.
+- Buildings always face the street now (the armory was turned sideways). Long keeps and the crypt get slate-roof wings instead of being turned.
+- Tavern, armory, stable and Governor entrances moved north so the marker sits right at the door.
+
+## Version 77 (Nov 7, 2026)
+
+- Painted art everywhere in the top view: ships, the Gravemaw's shell, the player, townsfolk, soldiers, pirates, shopkeepers, story characters, crypt monsters, castle guards, horses, farm animals, palm trees, bushes, rocks, shells, bones, tree stumps, pickups, buildings and fort and castle towers now use the hand-painted SpriteCook sprites. Sails, flags, legs and hooves are still drawn in code.
+- Held weapons use the painted weapon art too.
+- Wardrobe: new Outfit picker with six painted pirate outfits. Pick Classic to keep using your own coat and hat colours.
+- The tilted view still uses the old look.
+
+## Version 76 (Nov 7, 2026)
+
+- New painted ground: water, sand, grass, jungle, streets, docks, stone, cliffs and walls now use the hand-painted SpriteCook tiles with smooth blended edges instead of flat colour squares. Top view only for now (the tilted view still uses the old look). The old white foam strips along the shore are gone because the new sand tiles have the surf painted in.
+
 ## Version 75 (Oct 15, 2026)
 
 - Real fix for the controller stash glitch: the menu selection was being reset every frame while the stash was open, so it moved for one frame and snapped back. It now stays where you move it. Also: the weapon stash no longer jumps the controller highlight back to the first Stash it button after every action (a second A press stashed your weapon again). The highlight now stays where you were, or moves to the section header, and never starts on a Stash it button.
