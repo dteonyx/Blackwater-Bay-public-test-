@@ -2,6 +2,14 @@
 
 Generated from the in-game change log (Options > Change log).
 
+## Version 88 (Nov 11, 2026)
+
+- Online: Play Online goes straight into your online game (no title screen, no menu). Not signed in yet? The sign-in page opens and you go straight online once you sign in. Leaving online goes straight into your single-player game. If the server cannot be reached you get a message and stay where you are.
+- Corrals: each pen now sits right beside its own stable with the gate facing it (Port Royal clears a little jungle for it).
+- Map editor: new Corral tool (key 0). Click a pen to move it, drag its gold corner to resize it, choose the gate side and the animals, remove it, or drag out a new pen. Your pens work in single player and online.
+- Swimming: deep water is swimming now, with a painted swim stroke for every outfit. You can swim as long as you like, but you slow down as you tire; once tired, press the use button to wash up on the nearest beach.
+- Call Crew 'n Ship: a ship docked at the nearest harbour can now be called out to you (down the beach or out swimming). It is only blocked when she is already there or right beside you.
+
 ## Version 87 (Nov 11, 2026)
 
 - Calling your steed on a controller is D-pad Up only again (X / Square no longer does it).
