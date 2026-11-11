@@ -1,6 +1,64 @@
-# Blackwater Bay change log
+# Blackwater Bay change log (tester build)
 
 Generated from the in-game change log (Options > Change log).
+
+## Version 87 (Nov 11, 2026)
+
+- Calling your steed on a controller is D-pad Up only again (X / Square no longer does it).
+- Switch controllers: a Pro Controller or a Joy-Con pair connected to your PC or phone is recognised, and prompts use Switch names (the bottom button is B, ZR fires, and so on).
+- Options, Button names: Auto, Xbox, PlayStation or Switch, for a controller that is named wrongly.
+- VR on Meta Quest: Play in VR (main menu and Options) shows the game on a floating screen with the HUD and menus, and the Touch controllers work as an Xbox pad. Left stick click runs (hold: call your steed), right stick click opens the map (hold: pause menu). Options: VR passthrough on or off (works while in VR), VR screen size, and put the screen in front of me.
+- Options is tidier: Sound, Display, Controllers, Touch controls and VR are now sub-menus. Back (or B / Escape) steps out of a sub-menu first.
+- A controller the browser does not recognise now gets a one-time tip to set it up in Options, Controller test and setup. The setup steps now name buttons by position, so they read right on any controller.
+
+## Version 86 (Nov 10, 2026)
+
+- PlayStation controllers: a DualSense or DualShock connected by Bluetooth now works in Chrome. The browser was handing over its raw button layout, so the game read the left trigger as the right stick (the view kept swinging) and every face button one place off. The game now remaps it.
+- Options, Controller test and setup: press any button to see what the game reads, with the raw values underneath. Set up buttons walks through every button and stick for any controller and saves the layout on this device.
+- Controller: X / Square now calls your steed (as the prompts already said), and D-pad left and right zoom out and in.
+- Touch controls redone as a full on-screen Xbox-style pad: two sticks, A B X Y, bumpers, triggers, View, Menu, L3, R3 and the d-pad, so every controller action works on a phone or tablet. The right stick also fires (you can turn that off).
+- Options: Touch layout (Auto picks phone or tablet from the screen size, or choose one), Touch button opacity, and Edit touch layout: drag buttons, make them bigger or smaller, hide the ones you do not use, and save. Phone and tablet keep separate layouts.
+
+## Version 85 (Nov 10, 2026)
+
+- Map edits: the world can now carry a layer of hand-made changes from the new map editor (tiles, buildings and doors, lamps, props, people to talk to, map labels and interiors). It works the same in single player and online. No edits are in yet.
+
+## Version 84 (Nov 10, 2026)
+
+- Title screen music: "Intro" by Davy Glock, from the Take All Leave Nothing and Let No One Close EP (Fabricated Sanity Records). It fades in on the title screen (after your first click or key press, as browsers require) and fades out when you start sailing. The music at sea is unchanged.
+
+## Version 83 (Nov 10, 2026)
+
+- Harbour Office: the shipyard and the Harbour Registry are now one building with two front doors. The left door opens the boat workshop (the shipwright: repairs, ships, fittings), the right door the registry office (the clerk: ship papers, online waters). A doorway joins the two rooms, and each room has its own way out.
+- The blue shipyard anchor moved to the end of the pier and only works from a ship: sail up and press E for repairs and ships. It no longer covers the street, so it stops getting in the way on foot.
+- Doors now pull you in only when you step right onto them (the trigger is 3/4 of its old size).
+- Sea Legs: the stash lesson is gone. Sergeant Brand now drills recruits in the field south of the Armory, hands you the practice knives straight into your hands and sets up a straw training dummy: throw a knife into it, walk over the knife to pick it back up, then hit the dummy with your blade.
+- Horses: a knocked-out horse now lies on its side (new art for every breed). Calling it tells you how far away it is and in which direction. Any stable can fetch it and heal it for 120 gold, and a horse tonic beside it still works too.
+- Boarding: once the captain falls, a reminder and a prompt at the bow rail tell you to hold E to take her.
+- Papers, Please: a short fade carries you back to the Tortuga pier after the ship is stolen.
+- Washed Ashore: if you start behind the Rusty Anchor, the marker leads you round the corner to the door first.
+- Online: the game no longer pauses when the window loses focus.
+- Online seats: the captain steers; seat 2 runs the special weapons (harpoon, swivel) and the bow guns; seats 3 and 4 work the side cannons. Once seat 4 is taken, the captain only steers. With no special weapons fitted, seat 2 fires the broadsides.
+- Online: tap F beside a crewmate's ship to come aboard, tap F at your post to leave, and hold F to throw the captain off the wheel and take the helm yourself (crew only).
+- Online: a seated gunner's weapon bar now shows the seat's guns and the reload of each side.
+- Online: if the captain's ship disappears (stored, swapped or replaced), crew step ashore and rejoin the captain's new ship by themselves.
+- Online: crew can go below deck from the weapon wheel and see each other there. Galley, bunk and their own stash work for crew; the captain's desk stays the captain's.
+- Online: tutorial steps sync across a crew. A step anyone finishes is finished for everyone on the same quest, practice gear included.
+- Online: a finished crew contract now counts as a job done for every member, so everyone's story moves forward.
+- Online: if you drop and reconnect within 10 minutes, you get your old place in your crew back, captaincy included.
+
+## Version 82 (Nov 9, 2026)
+
+- Online (Beta): play with up to 8 pirates in one shared sea. Start it from Play Online (Beta) on the main menu, the pause menu, or the desk at any Harbour Registry (needs a cloud save account). A new world opens when one is full. The debug-menu switch is gone.
+- Shared world: everyone sees the same ships, soldiers, towns and loot. The first pirate in a world runs it; if they leave, the next one takes over. The world keeps going while you are paused or in a shop.
+- Crews of up to 4: join from the crew board in any tavern, walk up to a captain and ask, or get invited by name (Crew (Beta) in the pause menu). The captain picks the contracts and the whole crew sees the captain's objective, marker and timer (a crew member's tutorial waits until the contract ends). Any crew member can finish the job by sinking or capturing the target, and the crew is told who did. The captain chooses whether mission gold is split evenly or kept.
+- Sail together: the first aboard steers and fires the broadsides; the second mans the 360 swivel and the harpoon (or the broadsides if the ship has none); the rest fire broadsides. Every gunner has their own reload. Crews board enemy ships and fight on deck together.
+- Pirate fights: anyone outside your crew can fight you, anywhere. Sinking or killing another pirate takes 100 gold from them.
+- Fixed the slowdown after leaving a building or a boarded ship: the painted floors, walls and decks were drawn in a way that left the browser drawing slowly afterwards (around 20 frames a second instead of 60). Interior floors and walls are also drawn once and reused now, and the torch lighting is cheaper.
+
+## Version 81 (Nov 8, 2026)
+
+- Cloud saves moved to a new server (Cloudflare). Sign in with a username and password now instead of an email; there are no confirmation or reset emails. Old cloud accounts do not carry over: sign in or create an account and your save on this device uploads. The new server is live.
 
 ## Version 80 (Nov 8, 2026)
 

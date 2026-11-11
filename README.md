@@ -1,4 +1,6 @@
-# Blackwater Bay: installable web app
+# Blackwater Bay: installable web app (tester build)
+
+This repo carries the **tester** build, the same one deployed to the team tester on Netlify (test--blackwater-bay.netlify.app). The public release lives at https://blackwater-bay.netlify.app. Tester saves are kept separate from release saves.
 
 ## Hosting
 This repo is served by GitHub Pages: Settings > Pages > Deploy from a branch > `main` / root. Every push to `main` redeploys.
@@ -10,7 +12,7 @@ This repo is served by GitHub Pages: Settings > Pages > Deploy from a branch > `
 - **Xbox (Edge):** open the URL in Edge and plug in the pad. Xbox Edge cannot install web apps, but it can pin or bookmark the page.
 
 ## Updating the game
-Replace `index.html` with the new `blackwater-bay.html`, bump `VERSION` in `sw.js` (e.g. `bb-v2`), and push. Installed copies update on their next launch (they may need one extra relaunch).
+Each time the tester goes to Netlify, `index.html` is replaced with the new `blackwater-bay-tester.html` (songs go in `music/`), `VERSION` in `sw.js` is bumped (e.g. `bb-v2`), and push. Installed copies update on their next launch (they may need one extra relaunch).
 
 Saves live in each device's browser storage (they are not shared between devices).
 
