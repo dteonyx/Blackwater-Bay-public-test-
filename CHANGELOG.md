@@ -2,6 +2,13 @@
 
 Generated from the in-game change log (Options > Change log).
 
+## Version 89 (Nov 11, 2026)
+
+- Your map editor changes are in the game: moved and removed buildings in Tortuga and Port Royal, the new Tortuga shipyard with its two doors, painted ground, props and moved animal pens.
+- The map is wider: open sea now runs 160 tiles further east, room for a new area built in the map editor.
+- The big map (M) keeps the map's real shape.
+- Map editor: bigger ground brushes (16 and 32 tiles), and the minimap shows the whole wider map.
+
 ## Version 88 (Nov 11, 2026)
 
 - Online: Play Online goes straight into your online game (no title screen, no menu). Not signed in yet? The sign-in page opens and you go straight online once you sign in. Leaving online goes straight into your single-player game. If the server cannot be reached you get a message and stay where you are.
