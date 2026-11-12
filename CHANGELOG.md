@@ -2,6 +2,12 @@
 
 Generated from the in-game change log (Options > Change log).
 
+## Version 92 (Nov 11, 2026)
+
+- Debug menu from any controls: hold the weapon wheel open (Tab, LB on a controller, or the wheel on touch) and enter Up, Up, Left, Left, Right, Right, Down, Down. Holding O + P still works.
+- The debug menu works on a controller: D-pad or stick to move, A to pick, B to go back or close.
+- Controller: B and RB swap jobs. B now swaps hands; RB is the right hand (alt attack), which also fires the swivel and harpoon, including from a crew seat.
+
 ## Version 91 (Nov 11, 2026)
 
 - Papers, Please is rewritten. The Tortuga shipwright will not sell you a ship without papers, and Mercer overhears and steps in. Take his sloop and steal a ship, then sail her to the Hermit's Fence while Mercer follows in his sloop.

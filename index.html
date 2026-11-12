@@ -4138,17 +4138,17 @@ function renderDebug(){
 }
 function openDebug(){
   if(G.state!=='play'||G.dbg||player.dead||G.deck||G.shop)return;
-  G.dbg=true;G.dbgPage='root';mouse.down=false;mouse.rdown=false;renderDebug();$('dbgMsg').textContent='Hold O + P again, or press Esc, to close.';
-  dbgEl.classList.remove('hidden');sfx('ui');
+  G.dbg=true;G.dbgPage='root';mouse.down=false;mouse.rdown=false;renderDebug();$('dbgMsg').textContent='Hold O + P again, or press Esc (B on a controller), to close.';
+  dbgEl.classList.remove('hidden');sfx('ui');pad.menuRoot=null;
 }
-function closeDebug(){G.dbg=false;dbgEl.classList.add('hidden');}
+function closeDebug(){G.dbg=false;dbgEl.classList.add('hidden');padMenuClear();try{for(const b of dbgEl.querySelectorAll('.padsel'))b.classList.remove('padsel');}catch(e){}}
 function toggleDebug(){if(G.dbg)closeDebug();else openDebug();}
-function debugBack(){if(G.dbgPage!=='root'){G.dbgPage='root';renderDebug();$('dbgMsg').textContent='Hold O + P again, or press Esc, to close.';try{$('dbgItems').scrollTop=0;}catch(e){}}else closeDebug();}
+function debugBack(){if(G.dbgPage!=='root'){G.dbgPage='root';renderDebug();$('dbgMsg').textContent='Hold O + P again, or press Esc (B on a controller), to close.';pad.menuRoot=null;try{$('dbgItems').scrollTop=0;}catch(e){}}else closeDebug();}
 function debugRun(i){
   const it=dbgItems()[i];if(!it||it.head)return;
   const msg=it.run();
   if(it.close){closeDebug();return;}
-  if(it.nav){renderDebug();try{$('dbgItems').scrollTop=0;}catch(e){}$('dbgMsg').textContent='';sfx('ui');return;}
+  if(it.nav){renderDebug();pad.menuRoot=null;try{$('dbgItems').scrollTop=0;}catch(e){}$('dbgMsg').textContent='';sfx('ui');return;}
   if(msg)$('dbgMsg').textContent=msg;
   renderDebug();
   sfx('coin');
@@ -4162,6 +4162,16 @@ bm.addEventListener('click',e=>{
   if(fx<0||fx>1||fy<0||fy>1)return;
   G.tp=false;debugTeleport(fx*WW,fy*WH);toggleMap();toast('Teleported.','good');
 });
+// v92: open the debug menu from any input: hold the weapon wheel open, then Up Up Left Left Right Right Down Down
+const DBG_CODE='UULLRRDD';const dbgCode={buf:''};
+function dbgCodeIn(dir){
+  if(!WHEEL.open){dbgCode.buf='';return false;}
+  dbgCode.buf=(dbgCode.buf+dir).slice(-DBG_CODE.length);
+  if(dbgCode.buf!==DBG_CODE)return false;
+  dbgCode.buf='';WHEEL.close();
+  if(G.dbg)return true;
+  openDebug();return true;
+}
 function debugTick(dt){
   if(G.state==='play'&&!G.paused&&!G.bigmap&&keys.KeyO&&keys.KeyP){
     G.dbgHold+=dt;
@@ -4175,6 +4185,7 @@ $('resume').addEventListener('click',()=>{setPaused(false);$('resume').blur();})
 
 /* ================= save / load ================= */
 const CHANGELOG=[
+{v:92,d:'Nov 11, 2026',n:['Debug menu from any controls: hold the weapon wheel open (Tab, LB on a controller, or the wheel on touch) and enter Up, Up, Left, Left, Right, Right, Down, Down. Holding O + P still works.','The debug menu works on a controller: D-pad or stick to move, A to pick, B to go back or close.','Controller: B and RB swap jobs. B now swaps hands; RB is the right hand (alt attack), which also fires the swivel and harpoon, including from a crew seat.']},
 {v:91,d:'Nov 11, 2026',n:['Papers, Please is rewritten. The Tortuga shipwright will not sell you a ship without papers, and Mercer overhears and steps in. Take his sloop and steal a ship, then sail her to the Hermit\'s Fence while Mercer follows in his sloop.','At the Fence you sell the prize for a 150 gold cut and get your first forged papers free, on Mercer\'s tab. Mercer then drops you back at the Tortuga pier.','Shipwrights do not sell ships until Papers, Please is done. Harbourmaster Pell now hands new captains a Cutter for the First Command drill.','The Hermit\'s Fence now lives in a beached, half-sunk hull on the west beach of Hermit\'s Rest.']},
 {v:90,d:'Nov 11, 2026',n:['Bonny\'s Rest is rebuilt as a real pirate hangout (map editor), with a grand new tavern drawn to fit its size.','Ship papers are now forged: buy them from the Fence. The Harbour Office registry no longer sells papers; it sells more fleet slots instead (start with 3 ships, up to 8). Single player and online.','Swimming pirates are drawn smaller, closer to their size on land.','Map editor: the list of changes only shows what is new since your edits were last built into the game.','Port Royal and San Cristobal shipyards are rebuilt like Tortuga\'s: a smaller yard with one shipwright door and a bigger anchor spot.']},
 {v:89,d:'Nov 11, 2026',n:['Your map editor changes are in the game: moved and removed buildings in Tortuga and Port Royal, the new Tortuga shipyard with its two doors, painted ground, props and moved animal pens.','The map is wider: open sea now runs 160 tiles further east, room for a new area built in the map editor.','The big map (M) keeps the map\'s real shape.','Map editor: bigger ground brushes (16 and 32 tiles), and the minimap shows the whole wider map.']},
@@ -4260,7 +4271,7 @@ const CHANGELOG=[
 {v:39,d:'Earlier',n:[
 'Cloud saves with email sign-in, installable app (PWA), controller and touch support, music and sound volumes.']}
 ];
-const BB_V={main:84,tester:91},BB_DATE='Nov 11, 2026';
+const BB_V={main:92,tester:92},BB_DATE='Nov 11, 2026';
 // Online (Beta): the shared open world with no story quests, on its own save slot. NET is filled in by the online module.
 const ONLINE=(()=>{try{return localStorage.getItem('blackwaterbay.online')==='1';}catch(e){return false;}})();
 const NET={on:false};
@@ -4451,16 +4462,16 @@ function showMainMenu(){
       ['Tonic (horse)','Wheel','Wheel','Wheel'],
       ['Combat'],
       ['Left hand (attack)',kb('Click'),pill('RT',34),pill('R2',34)],
-      ['Right hand (alt attack)',kb('Space'),xb('B','#d0433a'),pp('o')],
+      ['Right hand (alt attack)',kb('Space'),pill('RB',34),pill('R1',34)],
       ['Aim lock-on (hold)',kb('Right-click'),pill('LT',34),pill('L2',34)],
-      ['Swap hands',kb('G'),pill('RB',34),pill('R1',34)],
+      ['Swap hands',kb('G'),xb('B','#d0433a'),pp('o')],
       ['Weapon wheel (weapons, items, crew, steed)','Hold '+kb('Tab')+' or middle mouse','Hold '+pill('LB',34)+', pick with a stick','Hold '+pill('L1',34)],
       ['Items'],
       ['Inventory','From the wheel','From the wheel','From the wheel'],
       ['At sea'],
       ['Sail and steer',kb('W')+' raise '+kb('S')+' lower '+kb('A')+kb('D')+' turn',stick('Up, down, left, right'),''],
       ['Broadside (aim up to 45&deg;)',kb('Click'),pill('RT',34),pill('R2',34)],
-      ['Swivel cannon, harpoon',kb('Space'),xb('B','#d0433a'),pp('o')],
+      ['Swivel cannon, harpoon',kb('Space'),pill('RB',34),pill('R1',34)],
       ['Switch special',kb('R'),'Wheel','Wheel'],
       ['Hijack a ship (no hold needed)',kb('F')+' alongside',xb('Y','#d6b020'),pp('t')],
       ['Below deck: bunk, desk, stash','Wheel, Below deck','Wheel','Wheel'],
@@ -4814,26 +4825,26 @@ function padNames(){return pad.touch?PADN.xbox:(PADN[pad.style]||PADN.xbox);}
 function padKey(k){
   if(!G.padOn)return k==='D'?'F':k;
   const n=padNames();
-  return ({E:n.A,F:n.Y,D:n.Y,Q:'D-pad Up',V:n.Y,R:n.LB,T:n.RB})[k]||k;
+  return ({E:n.A,F:n.Y,D:n.Y,Q:'D-pad Up',V:n.Y,R:n.LB,T:n.B,G:n.B,Space:n.RB})[k]||k;
 }
 /* text that names controls follows whichever input is in use: keyboard and mouse, Xbox or PlayStation pad */
 function ctl(t){
   if(typeof t!=='string'||!t)return t;
   const on=G.padOn,n=padNames();
   const kbT={USE:'E',WHEEL:'Tab',L:'the left mouse button',R:'Space',SWAP:'G',CALL:'H',LEAVE:'Q'};
-  const pdT={USE:n.A,WHEEL:n.LB,L:n.RT,R:n.LT,SWAP:n.RB,CALL:'D-pad Up',LEAVE:n.B};
+  const pdT={USE:n.A,WHEEL:n.LB,L:n.RT,R:n.LT,SWAP:n.B,CALL:'D-pad Up',LEAVE:n.B};
   const T=on?pdT:kbT;
   t=t.replace(/\{(USE|WHEEL|L|R|SWAP|CALL|LEAVE)\}/g,(m,k)=>T[k]);
   if(on){
     t=t.replace(/\b(press|hold) E\b/gi,(m,a)=>a+' '+n.A).replace(/\(E\)/g,'('+n.A+')').replace(/\bE: /g,n.A+': ')
-       .replace(/\bTab\b/g,n.LB).replace(/\(LMB\)/g,'('+n.RT+')').replace(/(the )?left mouse button/gi,n.RT).replace(/(the )?right mouse button/gi,n.LT).replace(/right mouse/gi,n.LT).replace(/\bSpace\b/g,n.B);
+       .replace(/\bTab\b/g,n.LB).replace(/\(LMB\)/g,'('+n.RT+')').replace(/(the )?left mouse button/gi,n.RT).replace(/(the )?right mouse button/gi,n.LT).replace(/right mouse/gi,n.LT).replace(/\bSpace\b/g,n.RB);
   }
   return t;
 }
 function padLabelHTML(v){
   const n=padNames();
   if(pad.touch)v=v.replace(/<span style="opacity:\.7">.*?<\/span>/g,'');
-  return v.replace(/<b>G<\/b>/g,'<b>'+n.RB+'</b>').replace(/<b>LMB<\/b>/g,'<b>'+n.RT+'</b>').replace(/<b>Space<\/b>/g,'<b>'+n.B+'</b>').replace(/<b>Tab<\/b>wheel/g,'<b>'+n.LB+'</b>wheel').replace(/<b>F<\/b>Leave/g,'<b>'+n.B+'</b>Leave').replace(/Tab wheel/g,n.LB+'/'+n.RB+' swap');
+  return v.replace(/<b>G<\/b>/g,'<b>'+n.B+'</b>').replace(/<b>LMB<\/b>/g,'<b>'+n.RT+'</b>').replace(/<b>Space<\/b>/g,'<b>'+n.RB+'</b>').replace(/<b>Tab<\/b>wheel/g,'<b>'+n.LB+'</b>wheel').replace(/<b>F<\/b>Leave/g,'<b>'+n.B+'</b>Leave').replace(/Tab wheel/g,n.LB+' wheel  '+n.B+' swap');
 }
 function padRange(){return G.deck?230:(player.ship?420:300);}
 /* aim lock-on: hold the lock button (right mouse / left trigger) to snap the aim to the nearest target */
@@ -4966,7 +4977,7 @@ function padPoll(dt){
     return;
   }
   if(G.state!=='play')return;
-  if(G.dbg){padReleaseAll();return;}
+  if(G.dbg){padReleaseAll();padMenu(dbgEl,dt,press2,lx,ly,debugBack);return;}
   if(G.paused){padReleaseAll();if(press2(9)){setPaused(false);return;}padMenu($('pause'),dt,press2,lx,ly,()=>setPaused(false));return;}
   if(G.stashOpen){padReleaseAll();padMenu($('stashOv'),dt,press2,lx,ly,closeStash);return;}
   padMenuClear();
@@ -4987,7 +4998,7 @@ function padPoll(dt){
   if(press2(10)){pad.run=!pad.run;toast(pad.run?'Run on':'Run off');}
   if(lm<DZ&&pad.run&&!pad.touch){pad.run=false;}
   padHold('ShiftLeft',!!pad.run);padHold('KeyE',b(0));padHold('KeyF',b(3));
-  padMouse('down',b(7));padMouse('rdown',b(1));padMouse('lock',b(6));
+  padMouse('down',b(7));padMouse('rdown',b(5));padMouse('lock',b(6)); // v92: RB = right hand / swivel / harpoon
   // aim with restricted reach
   const R=padRange();
   if(rm>DZ){pad.ang=Math.atan2(ry,rx);pad.dist=Math.max(50,Math.min(1,rm)*R);pad.rsT=G.t;}
@@ -4998,7 +5009,7 @@ function padPoll(dt){
   if(press2(12))onKey('KeyQ');
   if(press2(14))G.zoomMul=clamp(G.zoomMul*0.88,0.6,1.6);
   if(press2(15))G.zoomMul=clamp(G.zoomMul*1.13,0.6,1.6);
-  if(press2(5))onKey('KeyG');
+  if(press2(1))onKey('KeyG'); // v92: B swaps hands
   if(press2(3))rideToggle();
 }
 
@@ -5013,8 +5024,8 @@ function tSetBtn(i,v){vpad.buttons[i]={pressed:v,value:v?1:0};}
 /* every control: id, kind, standard button (or stick), face label, what it does, shape */
 const TCS=[
   ['LS','stick',0,'L','MOVE'],['RS','stick',2,'R','AIM'],
-  ['A','btn',0,'A','USE','face','#2faa4a'],['B','btn',1,'B','ALT','face','#d0433a'],['X','btn',2,'X','','face','#2f6fd0'],['Y','btn',3,'Y','MOUNT','face','#d6b020'],
-  ['LB','btn',4,'LB','WHEEL','sh'],['RB','btn',5,'RB','SWAP','sh'],['LT','btn',6,'LT','LOCK','tr'],['RT','btn',7,'RT','FIRE','tr'],
+  ['A','btn',0,'A','USE','face','#2faa4a'],['B','btn',1,'B','SWAP','face','#d0433a'],['X','btn',2,'X','','face','#2f6fd0'],['Y','btn',3,'Y','MOUNT','face','#d6b020'],
+  ['LB','btn',4,'LB','WHEEL','sh'],['RB','btn',5,'RB','ALT','sh'],['LT','btn',6,'LT','LOCK','tr'],['RT','btn',7,'RT','FIRE','tr'],
   ['BK','btn',8,'⧉','MAP','pill'],['ST','btn',9,'≡','MENU','pill'],
   ['L3','btn',10,'L3','RUN','sm'],['R3','btn',11,'R3','','sm'],
   ['DU','btn',12,'▲','CALL','dp'],['DD','btn',13,'▼','','dp'],['DL','btn',14,'◀','ZOOM−','dp'],['DR','btn',15,'▶','ZOOM+','dp']
@@ -9930,7 +9941,7 @@ function drawKnife(k){
   function open(src,sticky){
     if(WHEEL.open||G.state!=='play'||G.paused||G.shop||G.stashOpen||G.dlg||G.bigmap||player.dead)return false;
     if(G.deck&&G.deck.unarmed){toast('You have no weapons here.','bad');return false;}
-    WHEEL.items=weaponItems();WHEEL.level='main';WHEEL.src=src;WHEEL.sticky=!!sticky;WHEEL.open=true;WHEEL.sel=-1;
+    WHEEL.items=weaponItems();WHEEL.level='main';WHEEL.src=src;WHEEL.sticky=!!sticky;WHEEL.open=true;WHEEL.sel=-1;dbgCode.buf='';
     mouse.down=false;mouse.rdown=false;
     if(!wrap)ensure();
     wrap.style.display='flex';render();sfx('ui');return true;
@@ -9974,6 +9985,7 @@ function drawKnife(k){
     if(e.target&&/INPUT|TEXTAREA/.test(e.target.tagName))return;
     if(e.code==='Tab'){e.preventDefault();if(e.repeat)return;if(WHEEL.open&&WHEEL.sticky)close();else open('kb',false);}
     else if(e.code==='Enter'&&WHEEL.open&&WHEEL.sticky){e.preventDefault();finish();}
+    else if(WHEEL.open&&!e.repeat){const d={ArrowUp:'U',KeyW:'U',ArrowDown:'D',KeyS:'D',ArrowLeft:'L',KeyA:'L',ArrowRight:'R',KeyD:'R'}[e.code];if(d&&dbgCodeIn(d))e.preventDefault();}
   });
   addEventListener('keyup',e=>{if(e.code==='Tab'&&WHEEL.open&&WHEEL.src==='kb'&&!WHEEL.sticky)finish();});
   cv.addEventListener('mousedown',e=>{
@@ -9995,6 +10007,7 @@ function drawKnife(k){
       return false;
     }
     pad.fm=0;padMouse('down',false);padMouse('rdown',false);padMouse('lock',false);
+    if(press(12)&&dbgCodeIn('U'))return true;if(press(13)&&dbgCodeIn('D'))return true;if(press(14)&&dbgCodeIn('L'))return true;if(press(15)&&dbgCodeIn('R'))return true;
     const rm=Math.hypot(rx,ry),lm=Math.hypot(lx,ly);
     const sx=rm>0.4?rx:(lm>0.4?lx:0),sy=rm>0.4?ry:(lm>0.4?ly:0);
     if(sx||sy)setSel(pick(sx,sy,0.01));
@@ -10016,7 +10029,7 @@ function drawKnife(k){
       const a=document.createElement('div');a.textContent='Weapon wheel and commands';const b=document.createElement('div');b.innerHTML='Hold <span class="kbd">Tab</span> or middle mouse, move to a slice, release. <b>Commands</b> holds crew, steed and tonic.';ctrl.appendChild(a);ctrl.appendChild(b);
     }
     const ph=document.getElementById('padHelp');if(ph)ph.innerHTML=ph.innerHTML.replace('LB / L1 switch ranged or special','LB / L1 hold opens the weapon wheel (aim with a stick, press A / Cross to use, B / Circle to go back, release LB to close; pick Commands for crew, steed and tonic)').replace(' &middot; RB / R1 switch melee','');
-    const m=document.querySelector('.tb[data-b="5"]');if(m)m.textContent='SWAP';
+    const m=document.querySelector('.tb[data-b="5"]');if(m)m.textContent='ALT';const mb=document.querySelector('.tb[data-b="1"]');if(mb)mb.textContent='SWAP';
     const sw=document.querySelector('.tb[data-b="4"]');if(sw)sw.textContent='WHEEL';
     const cb=document.getElementById('crewBtn');if(cb)cb.remove();
   }catch(e){}
