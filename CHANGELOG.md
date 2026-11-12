@@ -2,6 +2,21 @@
 
 Generated from the in-game change log (Options > Change log).
 
+## Version 91 (Nov 11, 2026)
+
+- Papers, Please is rewritten. The Tortuga shipwright will not sell you a ship without papers, and Mercer overhears and steps in. Take his sloop and steal a ship, then sail her to the Hermit's Fence while Mercer follows in his sloop.
+- At the Fence you sell the prize for a 150 gold cut and get your first forged papers free, on Mercer's tab. Mercer then drops you back at the Tortuga pier.
+- Shipwrights do not sell ships until Papers, Please is done. Harbourmaster Pell now hands new captains a Cutter for the First Command drill.
+- The Hermit's Fence now lives in a beached, half-sunk hull on the west beach of Hermit's Rest.
+
+## Version 90 (Nov 11, 2026)
+
+- Bonny's Rest is rebuilt as a real pirate hangout (map editor), with a grand new tavern drawn to fit its size.
+- Ship papers are now forged: buy them from the Fence. The Harbour Office registry no longer sells papers; it sells more fleet slots instead (start with 3 ships, up to 8). Single player and online.
+- Swimming pirates are drawn smaller, closer to their size on land.
+- Map editor: the list of changes only shows what is new since your edits were last built into the game.
+- Port Royal and San Cristobal shipyards are rebuilt like Tortuga's: a smaller yard with one shipwright door and a bigger anchor spot.
+
 ## Version 89 (Nov 11, 2026)
 
 - Your map editor changes are in the game: moved and removed buildings in Tortuga and Port Royal, the new Tortuga shipyard with its two doors, painted ground, props and moved animal pens.
@@ -252,7 +267,7 @@ Generated from the in-game change log (Options > Change log).
 
 - Interiors for the tavern, armory, stable, governor, castle throne room, shipyard and Harbour Registry, with beds, meals, a weapon chest and a wardrobe where they belong.
 - Ship interior: captain's quarters with a bed, wardrobe and captain's desk, plus a stash and a rum barrel.
-- Papers: buy ship papers at the Harbour Registry, then claim a ship at the captain's desk (needs a free fleet slot, up to 3 ships).
+- Papers: buy forged ship papers from the Fence, then claim a ship at the captain's desk. You start with room for 3 ships; buy more fleet slots at a Harbour Office registry (up to 8).
 - New weapon system: two hands. Attack uses the left hand and alt attack the right. Swap hands from G or the wheel.
 - Thrown weapons: grenados, Molotov cocktails (rum bottles), throwing knives (max 20) and hatchets. Out of ammo you punch, or swing your last knife or hatchet.
 - Weapon wheel with sub-menus for weapons, items, crew and steed.
